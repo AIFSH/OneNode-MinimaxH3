@@ -23,6 +23,7 @@ These are the commit SHAs the node was developed against. You don't need to pin 
 | ComfyUI-SolAttn_triton | `842c4ea` | Speed preset |
 | ComfyUI-MiniMaxH3-Cache | `8a45e09` | Speed preset |
 | comfyui-kjnodes | `6ab7e81` | High Quality preset (SageAttention) |
+| Comfyui_Minimax_h3_latent_Upscaler | `59f399f` | Optional Latent Upscaler panel |
 
 > **Important for Chain / Keyframes / Extend:** `ComfyUI-H3-Motion-Context-MultiRef`
 > current `main` dropped the legacy patch path and requires ComfyUI PR #15439

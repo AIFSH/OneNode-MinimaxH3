@@ -48,8 +48,6 @@ const I18N = {
     "ui.settings": "Settings",
     "ui.refresh.models": "Refresh models",
     "ui.close": "Close",
-    "ui.upscale.method": "Upscale method",
-    "ui.upscale.hint": "Used by the 2x button under the video. Pick 'none' on the DiT to disable SeedVR2 - then switch the method to RTX VSR.",
     "ui.speed.lora": "Speed LoRA (Turbo preset)",
     "ui.speed.lora.hint": "Used by the Turbo quality preset.",
     "ui.completion.sound": "Completion sound",
@@ -68,8 +66,17 @@ const I18N = {
     "ui.model.clip": "Text encoder (CLIP)",
     "ui.model.vae.video": "Video VAE",
     "ui.model.vae.audio": "Audio VAE",
-    "ui.model.upscale.dit": "Upscale DiT model (SeedVR2)",
-    "ui.model.upscale.vae": "Upscale VAE (SeedVR2)",
+    "ui.latent.upscaler": "Latent Upscaler",
+    "ui.latent.enabled": "Enable latent upscale",
+    "ui.latent.model": "Latent upscaler model",
+    "ui.latent.variant": "Variant",
+    "ui.latent.scale": "Scale",
+    "ui.latent.device": "Device",
+    "ui.latent.precision": "Precision",
+    "ui.latent.hint": "Runs in latent space after sampling and before VAE decode. Requires Comfyui_Minimax_h3_latent_Upscaler and a model in ComfyUI/models/latent_upscale_models/.",
+    "err.latent.model": "Latent upscaling is enabled, but no latent upscaler model is selected. Open the Latent Upscaler panel and choose a model.",
+    "tip.latent.variant": "2D is faster and lighter; 3D gives stronger temporal coherence. Both preserve the time dimension and only scale H x W.",
+    "tip.latent.scale": "Spatial scale from 1.0x to 4.0x. 1.0 keeps the latent unchanged.",
     "ui.history": "History",
     "ui.library": "Library",
     "ui.discover": "Discover",
@@ -111,17 +118,11 @@ const I18N = {
     "ui.video.word": "video",
     "ui.generate": "Generate",
     "ui.generating": "Generating...",
-    "ui.upscaling": "Upscaling...",
     "ui.stop": "Stop",
-    "ui.up.2x": "2x Upscale",
     "ui.save.on": "Save On",
     "ui.save.off": "Save Off",
     "ui.autosave.title": "Auto-save videos to your ComfyUI output folder. Off = preview only (temp files, cleaned on restart).",
     "ui.error.title": "Something went wrong",
-    "ui.compare": "Compare",
-    "ui.exit.compare": "Exit compare",
-    "ui.upscaled": "UPSCALED",
-    "ui.original": "ORIGINAL",
     "ui.generation.time": "Generation time",
     "ui.seed": "Seed",
     "ui.random": "Random",
@@ -204,8 +205,6 @@ const I18N = {
     "err.r2v.maxvideos": "R2V supports up to 3 reference videos. Remove one first.",
     "err.load.video": "Could not load video into {n}:",
     "err.copy.video": "Could not copy the video to the input folder",
-    "err.upscale.model": "Upscale needs a SeedVR2 model. Open Settings, then pick an Upscale DiT model + Upscale VAE - or switch the Upscale method to RTX VSR, which needs no model.",
-    "err.prep.upscale": "Could not prepare the video for upscale",
     "err.tpl": "Failed to load workflow template: {n}",
     "err.turbo.lora": "Turbo preset needs a Turbo LoRA - set one in Settings (Speed LoRA) or pick another quality.",
     "err.i2v.image": "I2V needs at least one image. Drop a First frame (animate from it), a Last frame (converge to it), or both (morph between them) - or switch to T2V mode.",
@@ -216,8 +215,6 @@ const I18N = {
     "ui.today": "Today",
     "ui.unfavorite": "Unfavorite",
     "ui.delete.confirm": "Delete {n}?",
-    "tip.upscale.method": "Two upscalers - switch any time:\nRTX VSR: driver-accelerated, very fast, up to 4x, needs no model.\nSeedVR2: AI diffusion restorer, richer detail, slower, uses the DiT + VAE below.",
-    "tip.upscale.dit": "Picking a model you don't have yet downloads it automatically on first use - the SeedVR2 pack handles the download. GGUF and safetensors variants both work.",
     "tip.audio.native": "R2V and Chain Audio Lock always use the audio you provide - this toggle only controls the model's own generated soundtrack in T2V / I2V / Keyframes.",
     "tip.resolution": "The output pixel grid (width x height).\nHigher = sharper detail and more VRAM + time.\nPick Custom to set any size - snapped to multiples of 32.\nMiniMax H3 recommends up to 1344x768 (short edge <= 768, long edge <= 1344). Above that the model may repeat content or distort.",
     "tip.quality": "The sampling pipeline, not the pixel size.\nBalanced: SolAttn sparse attention + your steps.\nSpeed: SolAttn + H3 block cache (fastest, tiny quality tradeoff).\nHigh Quality: full SageAttention - no sparse attention, no cache. Slowest, maximum fidelity.\nTurbo: Turbo LoRA + 6-step distilled sampler. Much faster, visibly lower quality - needs the Turbo LoRA set in Settings.",
@@ -255,8 +252,6 @@ const I18N = {
     "ui.settings": "设置",
     "ui.refresh.models": "刷新模型",
     "ui.close": "关闭",
-    "ui.upscale.method": "放大方式",
-    "ui.upscale.hint": "视频下方的 2x 按钮会用到。将 DiT 选为 none 可关闭 SeedVR2，然后把方式切换为 RTX VSR。",
     "ui.speed.lora": "加速 LoRA（Turbo 预设）",
     "ui.speed.lora.hint": "Turbo 画质预设会用到。",
     "ui.completion.sound": "完成提示音",
@@ -275,8 +270,17 @@ const I18N = {
     "ui.model.clip": "文本编码器（CLIP）",
     "ui.model.vae.video": "视频 VAE",
     "ui.model.vae.audio": "音频 VAE",
-    "ui.model.upscale.dit": "放大 DiT 模型（SeedVR2）",
-    "ui.model.upscale.vae": "放大 VAE（SeedVR2）",
+    "ui.latent.upscaler": "Latent 放大",
+    "ui.latent.enabled": "启用 latent 放大",
+    "ui.latent.model": "Latent 放大模型",
+    "ui.latent.variant": "版本",
+    "ui.latent.scale": "放大倍数",
+    "ui.latent.device": "设备",
+    "ui.latent.precision": "精度",
+    "ui.latent.hint": "在采样后、VAE 解码前于 latent 空间执行。需要安装 Comfyui_Minimax_h3_latent_Upscaler，并将模型放入 ComfyUI/models/latent_upscale_models/。",
+    "err.latent.model": "已启用 latent 放大，但未选择模型。请打开 Latent 放大专栏选择模型。",
+    "tip.latent.variant": "2D 更快、更轻量；3D 时间一致性更强。两个版本都保持时间长度不变，仅放大宽高。",
+    "tip.latent.scale": "空间放大倍数，范围 1.0x 到 4.0x。1.0 表示不改变 latent。",
     "ui.history": "历史",
     "ui.library": "库",
     "ui.discover": "发现",
@@ -318,17 +322,11 @@ const I18N = {
     "ui.video.word": "视频",
     "ui.generate": "生成",
     "ui.generating": "生成中...",
-    "ui.upscaling": "放大中...",
     "ui.stop": "停止",
-    "ui.up.2x": "2x 放大",
     "ui.save.on": "保存开",
     "ui.save.off": "保存关",
     "ui.autosave.title": "将视频自动保存到 ComfyUI 输出文件夹。关闭 = 仅预览（临时文件，重启后清理）。",
     "ui.error.title": "出错了",
-    "ui.compare": "对比",
-    "ui.exit.compare": "退出对比",
-    "ui.upscaled": "放大后",
-    "ui.original": "原图",
     "ui.generation.time": "生成时间",
     "ui.seed": "种子",
     "ui.random": "随机",
@@ -411,8 +409,6 @@ const I18N = {
     "err.r2v.maxvideos": "R2V 最多支持 3 个参考视频，请先移除一个。",
     "err.load.video": "无法将视频载入 {n}：",
     "err.copy.video": "无法将视频复制到输入文件夹",
-    "err.upscale.model": "放大需要 SeedVR2 模型。打开设置，选择 Upscale DiT 模型 + Upscale VAE - 或将放大方式切换为 RTX VSR（无需模型）。",
-    "err.prep.upscale": "无法为放大准备视频",
     "err.tpl": "加载工作流模板失败：{n}",
     "err.turbo.lora": "Turbo 预设需要 Turbo LoRA - 请在设置（Speed LoRA）中设置，或选择其他画质。",
     "err.i2v.image": "I2V 至少需要一张图片。拖入首帧（从它开始动画）、末帧（收敛到它），或两者（在其间变形）- 或切换到 T2V 模式。",
@@ -423,8 +419,6 @@ const I18N = {
     "ui.today": "今天",
     "ui.unfavorite": "取消收藏",
     "ui.delete.confirm": "删除 {n}？",
-    "tip.upscale.method": "两种放大方式，可随时切换：\nRTX VSR：驱动加速，非常快，最高 4 倍，无需模型。\nSeedVR2：AI 扩散修复，细节更丰富，更慢，使用下方的 DiT + VAE。",
-    "tip.upscale.dit": "选择尚未下载的模型时，会在首次使用时自动下载 - SeedVR2 包负责下载。GGUF 和 safetensors 变体均可。",
     "tip.audio.native": "R2V 和链的 Audio Lock 始终使用你提供的音频 - 此开关只控制 T2V / I2V / 关键帧模式中模型自己生成的配乐。",
     "tip.resolution": "输出像素网格（宽 x 高）。\n越高 = 细节越清晰，显存和时间也越多。\n选择自定义可设置任意尺寸 - 会吸附到 32 的倍数。\nMiniMax H3 推荐最高 1344x768（短边 <= 768，长边 <= 1344）。超过后模型可能重复内容或变形。",
     "tip.quality": "采样管线，而非像素尺寸。\nBalanced：SolAttn 稀疏注意力 + 你的步数。\nSpeed：SolAttn + H3 块缓存（最快，画质损失很小）。\nHigh Quality：完整 SageAttention - 无稀疏注意力、无缓存。最慢，保真度最高。\nTurbo：Turbo LoRA + 6 步蒸馏采样。快得多，画质明显下降 - 需要在设置中设置 Turbo LoRA。",
@@ -661,8 +655,7 @@ const DEFAULT_MODELS = {
   clip:"qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
   vaeVideo:"minimax_h3_video_vae_fp16.safetensors",
   vaeAudio:"minimax_h3_audio_vae_fp32.safetensors",
-  upscaleDit:"none",
-  upscaleVae:"none",
+  latentUpscaleModel:"none",
 };
 
 function snapFrames(seconds){
@@ -1301,8 +1294,17 @@ app.registerExtension({
           mcLength:        saved.mcLength!==undefined?saved.mcLength:22,
           customW:         saved.customW||960,
           customH:         saved.customH||544,
-          upscaleFactor:   saved.upscaleFactor||2,
-          upscaleMethod:   saved.upscaleMethod||"seedvr",
+          latentUpscale:   (saved.latentUpscale&&typeof saved.latentUpscale==="object")
+            ? {
+                enabled: !!saved.latentUpscale.enabled,
+                model: saved.latentUpscale.model || (saved.models && saved.models.latentUpscaleModel) || "none",
+                variant: saved.latentUpscale.variant === "3d" ? "3d" : "2d",
+                scale: Number(saved.latentUpscale.scale) || 2.0,
+                device: saved.latentUpscale.device === "cpu" ? "cpu" : "cuda",
+                precision: ["fp32","fp16","bf16"].includes(saved.latentUpscale.precision)
+                  ? saved.latentUpscale.precision : "fp32",
+              }
+            : {enabled:false, model:(saved&&saved.models&&saved.models.latentUpscaleModel)||"none", variant:"2d", scale:2.0, device:"cuda", precision:"fp32"},
           modeSettings:    (saved.modeSettings&&typeof saved.modeSettings==="object")?saved.modeSettings:{},
           autoSave:        saved.autoSave!==undefined?saved.autoSave:true,
           generating:      false,
@@ -1354,7 +1356,7 @@ app.registerExtension({
           kf:(S.kf||[]).map(k=>({img:k.img||null,pos:k.pos||0})),
           models:S.models,speedLora:S.speedLora,audioOn:S.audioOn,
           soundEnabled:S.soundEnabled,sound:S.sound,accent:S.accent,mcLength:S.mcLength,
-          upscaleFactor:S.upscaleFactor,upscaleMethod:S.upscaleMethod,
+          latentUpscale:S.latentUpscale,
           modeSettings:S.modeSettings,
           autoSave:S.autoSave,customW:S.customW,customH:S.customH,
           playOnFinish:S.playOnFinish,folded:S.folded,
@@ -1561,22 +1563,6 @@ app.registerExtension({
       const clipRow=_mkModelRow("clip","ui.model.clip");
       const vaeVRow=_mkModelRow("vaeVideo","ui.model.vae.video");
       const vaeARow=_mkModelRow("vaeAudio","ui.model.vae.audio");
-      const upMethodWrap=mk("div",{marginBottom:"12px"});
-      const upMethodCapRow=mk("div",{display:"flex",alignItems:"center",gap:"4px"});
-      const upMethodCap=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".1em",textTransform:"uppercase",color:C.muted});
-      _tr(upMethodCap,"ui.upscale.method");
-      upMethodCapRow.append(upMethodCap,infoIcon("tip.upscale.method"));
-      upMethodWrap.appendChild(upMethodCapRow);
-      const upMethodDD=DD(["SeedVR2 (AI restore)","RTX VSR (fast)"],S.upscaleMethod==="rtx"?"RTX VSR (fast)":"SeedVR2 (AI restore)",v=>{
-        S.upscaleMethod=v==="RTX VSR (fast)"?"rtx":"seedvr";
-        persist();_updUpBtnTitle();
-      });
-      upMethodWrap.appendChild(upMethodDD.el);
-      const upDitRow=_mkModelRow("upscaleDit","ui.model.upscale.dit",["none"],()=>_updUpBtnTitle());
-      upDitRow.firstChild.appendChild(infoIcon("tip.upscale.dit"));
-      const upVaeRow=_mkModelRow("upscaleVae","ui.model.upscale.vae",["none"],()=>_updUpBtnTitle());
-      const upHint=mk("div",{fontSize:"9px",color:C.muted,marginTop:"4px",lineHeight:"1.4",marginBottom:"12px"});
-      _tr(upHint,"ui.upscale.hint");
       const speedLoraWrap=mk("div",{marginBottom:"12px"});
       speedLoraWrap.appendChild(cap("ui.speed.lora"));
       const speedLoraDD=DD(["none"],S.speedLora,v=>{S.speedLora=v==="none"?"":v;persist();});
@@ -1638,7 +1624,7 @@ app.registerExtension({
       const wechatHint=mk("div",{fontSize:"10px",color:C.muted,textAlign:"center",lineHeight:"1.5"});
       _tr(wechatHint,"ui.wechat.hint");
       supWrap.append(supCap,qrBox,wechatHint);
-      settingsOverlay.append(settHdr,unetT2VRow,unetR2VRow,clipRow,vaeVRow,vaeARow,upMethodWrap,upDitRow,upVaeRow,upHint,speedLoraWrap,audioToggle.el,soundToggle.el,playOnFinishToggle.el,sndWrap,accWrap,supWrap);
+      settingsOverlay.append(settHdr,unetT2VRow,unetR2VRow,clipRow,vaeVRow,vaeARow,speedLoraWrap,audioToggle.el,soundToggle.el,playOnFinishToggle.el,sndWrap,accWrap,supWrap);
 
       // -- HISTORY OVERLAY ---------------------------------------------------
       const historyOverlay=mk("div",{
@@ -1677,17 +1663,10 @@ app.registerExtension({
       };
       let _histItems=[];
       let _histOpenId=null;
-      // History row mode metadata: per-mode icon+color, upscale methods, turbo
+      // History row mode metadata: per-mode icon and color.
       const _HIST_MODE_COLORS={t2v:"#c0a996",i2v:"#5aa8ff",r2v:"#5fd08c",audio_drive:"#c07fff",keyframes:"#ffc266",extend:"#7ed491",chain:"#4dd0e1"};
-      const _HIST_UP_COLORS={rtx:"#5aa8ff",seedvr:"#c07fff"};
       const _histModeMeta=(mode)=>{
         const m=String(mode||"");
-        const up=m.match(/^Upscale\s+(\d+)x\s+\(([^)]+)\)/i);
-        if(up){
-          const isRtx=/rtx/i.test(up[2]);
-          return {kind:"upscale",label:up[1]+"x",method:up[2],color:_HIST_UP_COLORS[isRtx?"rtx":"seedvr"],
-            icon:'<path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>'};
-        }
         const c=_HIST_MODE_COLORS[m]||"#c0a996";
         return {kind:"mode",label:m||"t2v",color:c,icon:MODE_ICONS[m]||MODE_ICONS.t2v};
       };
@@ -1792,7 +1771,7 @@ app.registerExtension({
           rowMain.append(rowPrompt,rowTime);
           const mmeta=_histModeMeta(it.mode);
           const mic=_mkHistIcon(mmeta,24);
-          mic.title=mmeta.kind==="upscale"?("Upscale "+mmeta.label+" ("+mmeta.method+")"):(MODE_HINTS[mmeta.label]||mmeta.label);
+          mic.title=MODE_HINTS[mmeta.label]||mmeta.label;
           row.append(mic,rowMain);
           if(it.quality==="turbo"){
             const tChip=mk("span",{width:"18px",height:"18px",borderRadius:"5px",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:"0",border:"1px solid rgba(255,194,102,.45)",background:"rgba(255,194,102,.1)",color:"#ffc266"});
@@ -2934,6 +2913,78 @@ app.registerExtension({
       };
       _renderLoras();
 
+      // -- Latent upscaler panel ----------------------------------------------
+      const latentCard=mk("div",{}, {className:"h3-card"});
+      const latentHdr=mk("div",{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",userSelect:"none"});
+      const latentTitle=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".1em",textTransform:"uppercase",color:C.muted});
+      _tr(latentTitle,"ui.latent.upscaler");
+      const latentChev=mk("span",{color:C.dim,fontSize:"10px",flexShrink:"0"});
+      tx(latentChev,"▾");
+      latentHdr.append(latentTitle,latentChev);
+      const latentBody=mk("div",{display:"flex",flexDirection:"column",gap:"7px"});
+      const latentToggle=Toggle("ui.latent.enabled",S.latentUpscale.enabled,v=>{
+        S.latentUpscale.enabled=v;persist();_updLatentUI();
+      });
+      latentBody.appendChild(latentToggle.el);
+      const latentModelWrap=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
+      const latentModelCap=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:C.muted});
+      _tr(latentModelCap,"ui.latent.model");
+      latentModelWrap.appendChild(latentModelCap);
+      const latentUpscaleDD=DD(["none"],S.latentUpscale.model,v=>{
+        S.latentUpscale.model=v;S.models.latentUpscaleModel=v;persist();_updLatentUI();
+      });
+      latentModelWrap.appendChild(latentUpscaleDD.el);
+      latentBody.appendChild(latentModelWrap);
+      const latentGrid=mk("div",{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"7px"});
+      const latentVarWrap=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
+      const latentVarCapRow=mk("div",{display:"flex",alignItems:"center",gap:"4px"});
+      const latentVarCap=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:C.muted});
+      _tr(latentVarCap,"ui.latent.variant");
+      latentVarCapRow.append(latentVarCap,infoIcon("tip.latent.variant"));
+      latentVarWrap.appendChild(latentVarCapRow);
+      const latentVarDD=DD(["2D","3D"],S.latentUpscale.variant==="3d"?"3D":"2D",v=>{
+        S.latentUpscale.variant=v==="3D"?"3d":"2d";persist();_updLatentUI();
+      });
+      latentVarWrap.appendChild(latentVarDD.el);
+      const latentScaleWrap=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
+      const latentScaleCapRow=mk("div",{display:"flex",alignItems:"center",gap:"4px"});
+      const latentScaleCap=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:C.muted});
+      _tr(latentScaleCap,"ui.latent.scale");
+      latentScaleCapRow.append(latentScaleCap,infoIcon("tip.latent.scale"));
+      latentScaleWrap.appendChild(latentScaleCapRow);
+      const latentScaleNI=NI("",S.latentUpscale.scale,1.0,4.0,0.1,v=>{
+        S.latentUpscale.scale=Math.round(v*10)/10;persist();_updLatentUI();
+      },"100%");
+      latentScaleWrap.appendChild(latentScaleNI);
+      const latentDevWrap=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
+      const latentDevCap=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:C.muted});
+      _tr(latentDevCap,"ui.latent.device");
+      latentDevWrap.appendChild(latentDevCap);
+      const latentDevDD=DD(["cuda","cpu"],S.latentUpscale.device,v=>{
+        S.latentUpscale.device=v;persist();_updLatentUI();
+      });
+      latentDevWrap.appendChild(latentDevDD.el);
+      const latentPrecWrap=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
+      const latentPrecCap=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:C.muted});
+      _tr(latentPrecCap,"ui.latent.precision");
+      latentPrecWrap.appendChild(latentPrecCap);
+      const latentPrecDD=DD(["fp32","fp16","bf16"],S.latentUpscale.precision,v=>{
+        S.latentUpscale.precision=v;persist();_updLatentUI();
+      });
+      latentPrecWrap.appendChild(latentPrecDD.el);
+      latentGrid.append(latentVarWrap,latentScaleWrap,latentDevWrap,latentPrecWrap);
+      latentBody.appendChild(latentGrid);
+      const latentHint=mk("div",{fontSize:"8px",color:C.muted,lineHeight:"1.5"});
+      _tr(latentHint,"ui.latent.hint");
+      latentBody.appendChild(latentHint);
+      latentCard.append(latentHdr,latentBody);
+      const _updLatentUI=()=>{
+        const on=S.latentUpscale.enabled;
+        latentBody.style.opacity=on?"1":".45";
+        latentToggle._setChecked(on);
+      };
+      _updLatentUI();
+
       // -- Seed row (inside the Tune card) ------------------------------------
       const seedBody=mk("div",{display:"flex",flexDirection:"column",gap:"5px"});
       const seedRow=mk("div",{}, {className:"h3-seedrow"});
@@ -3004,75 +3055,6 @@ app.registerExtension({
       };
       seedChip.append(seedChipLbl,seedChipVal,seedChipCopy);
       previewBox.append(placeholder,vidEl,errorBox,progWrap,seedChip);
-      const comparerWrap=mk("div",{position:"absolute",inset:"0",display:"none",cursor:"col-resize",userSelect:"none",borderRadius:"10px",overflow:"hidden",zIndex:"3"});
-      const cmpBase=mk("video",{position:"absolute",inset:"0",width:"100%",height:"100%",objectFit:"contain",background:"#000"},{muted:true,loop:true,preload:"auto"});
-      const cmpGen=mk("div",{position:"absolute",top:"0",left:"0",bottom:"0",overflow:"hidden",width:"50%"});
-      const cmpGenVid=mk("video",{position:"absolute",top:"0",left:"0",height:"100%",objectFit:"contain",background:"#000"},{muted:true,loop:true,preload:"auto"});
-      cmpGen.appendChild(cmpGenVid);
-      const cmpLine=mk("div",{position:"absolute",top:"0",bottom:"0",width:"2px",background:C.lime,left:"calc(50% - 1px)",boxShadow:"0 0 8px rgba(var(--h3accent-rgb),.55)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:"4"});
-      const cmpHandle=mk("div",{width:"30px",height:"30px",borderRadius:"50%",background:C.lime,border:"2px solid #111",flexShrink:"0",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 10px rgba(0,0,0,.7)",pointerEvents:"none"});
-      cmpHandle.innerHTML=`<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#111" stroke-width="2.5" stroke-linecap="round"><path d="M8 4l-4 8 4 8M16 4l4 8-4 8"/></svg>`;
-      cmpLine.appendChild(cmpHandle);
-      const cmpLbl1=mk("div",{position:"absolute",top:"8px",left:"8px",fontSize:"8px",fontWeight:"700",letterSpacing:".06em",color:"#111",background:C.lime,borderRadius:"4px",padding:"2px 6px",zIndex:"5",pointerEvents:"none"});
-      _tr(cmpLbl1,"ui.upscaled");
-      const cmpLbl2=mk("div",{position:"absolute",top:"8px",right:"8px",fontSize:"8px",fontWeight:"700",letterSpacing:".06em",color:"rgba(255,255,255,.85)",background:"rgba(0,0,0,.55)",borderRadius:"4px",padding:"2px 6px",zIndex:"5",pointerEvents:"none"});
-      _tr(cmpLbl2,"ui.original");
-      comparerWrap.append(cmpBase,cmpGen,cmpLine,cmpLbl1,cmpLbl2);
-      previewBox.appendChild(comparerWrap);
-      let _cmpDragging=false;
-      const _cmpSetPct=(pct)=>{
-        pct=Math.max(0,Math.min(100,pct));
-        cmpGen.style.width=pct+"%";
-        cmpLine.style.left=`calc(${pct}% - 1px)`;
-        cmpGenVid.style.width=(comparerWrap.offsetWidth||600)+"px";
-      };
-      comparerWrap.addEventListener("mousedown",e=>{_cmpDragging=true;e.preventDefault();});
-      document.addEventListener("mousemove",e=>{
-        if(!_cmpDragging) return;
-        const r=comparerWrap.getBoundingClientRect();
-        _cmpSetPct((e.clientX-r.left)/r.width*100);
-      });
-      document.addEventListener("mouseup",()=>{_cmpDragging=false;});
-      comparerWrap.addEventListener("touchstart",()=>{_cmpDragging=true;},{passive:true});
-      comparerWrap.addEventListener("touchmove",e=>{
-        if(!_cmpDragging) return;
-        const r=comparerWrap.getBoundingClientRect();
-        _cmpSetPct((e.touches[0].clientX-r.left)/r.width*100);
-      },{passive:true});
-      comparerWrap.addEventListener("touchend",()=>{_cmpDragging=false;});
-      const cmpBtn=mk("button",{position:"absolute",top:"8px",left:"8px",display:"none",background:"rgba(0,0,0,.72)",border:`1px solid ${C.borderH}`,borderRadius:"6px",padding:"3px 10px",fontSize:"9px",fontWeight:"700",color:C.text,cursor:"pointer",outline:"none",zIndex:"6",letterSpacing:".04em"});
-      tx(cmpBtn,t("ui.compare"));
-      cmpBtn.onmouseenter=()=>{cmpBtn.style.borderColor=C.lime;cmpBtn.style.color=C.lime;};
-      cmpBtn.onmouseleave=()=>{cmpBtn.style.borderColor=C.borderH;cmpBtn.style.color=C.text;};
-      cmpBtn.onclick=()=>{ _cmpMode?_exitCompare():_enterCompare(); };
-      previewBox.appendChild(cmpBtn);
-      let _cmpMode=false;
-      let _upOrig=null;
-      let _upResult=null;
-      let _upscaleRun="";
-      const _enterCompare=()=>{
-        if(!_upOrig||!_curItem) return;
-        const upUrl=api.apiURL(`/view?filename=${encodeURIComponent(_curItem.filename)}&type=output&subfolder=${encodeURIComponent(_curItem.subfolder||"")}`);
-        const orUrl=api.apiURL(`/view?filename=${encodeURIComponent(_upOrig.filename)}&type=output&subfolder=${encodeURIComponent(_upOrig.subfolder||"")}`);
-        cmpGenVid.src=upUrl;
-        cmpBase.src=orUrl;
-        cmpGenVid.load();cmpBase.load();
-        _cmpMode=true;
-        _cmpSetPct(50);
-        vidEl.style.display="none";
-        comparerWrap.style.display="block";
-        tx(cmpBtn,t("ui.exit.compare"));
-        cmpGenVid.play().catch(()=>{});
-        cmpBase.play().catch(()=>{});
-      };
-      const _exitCompare=()=>{
-        _cmpMode=false;
-        cmpGenVid.pause();cmpBase.pause();
-        cmpGenVid.src="";cmpBase.src="";
-        comparerWrap.style.display="none";
-        vidEl.style.display="block";
-        tx(cmpBtn,t("ui.compare"));
-      };
       const setStage=(l,p)=>{
         tx(progStage,l);progFill.style.width=p+"%";tx(progPct,Math.round(p)+"%");
       };
@@ -3125,52 +3107,11 @@ app.registerExtension({
       };
       const ICON_FAV='<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/>';
       const ICON_OPEN='<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/>';
-      const ICON_UP='<path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>';
       const ICON_DEL='<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/>';
       const ICON_REFRESH='<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>';
-      const upBtn=actBtn("ui.up.2x",()=>_runUpscale(),{icon:ICON_UP});
-      const upFactorWrap=mk("div",{width:"74px",flexShrink:"0"});
-      const upFactorDD=DD(["2x","3x","4x"],S.upscaleFactor+"x",v=>{
-        S.upscaleFactor=parseInt(v)||2;
-        tx(upBtn._lbl,S.upscaleFactor+"x Upscale");
-        persist();_updUpBtnTitle();
-      });
-      upFactorWrap.appendChild(upFactorDD.el);
-      const upTrig=upFactorDD.el.firstChild;
-      upTrig.style.width="74px";
-      upTrig.style.height="26px";
-      upTrig.style.borderRadius="8px";
-      upTrig.style.background="linear-gradient(180deg,#2b2b2b,#1e1e1e)";
-      upTrig.style.border="1px solid var(--h3-line2)";
-      upTrig.style.borderBottomColor="#141414";
-      upTrig.style.boxShadow="inset 0 1px 0 rgba(255,255,255,.07), 0 1px 3px rgba(0,0,0,.45)";
-      upTrig.style.padding="0 8px";
-      upTrig.style.justifyContent="center";
-      upTrig.lastChild.style.marginLeft="3px";
-      upTrig.onmouseenter=()=>{ upTrig.style.borderColor="var(--h3accent)"; };
-      upTrig.onmouseleave=()=>{ if(upTrig.style.borderColor!=="var(--h3accent)") upTrig.style.borderColor="var(--h3-line2)"; };
-      const _updUpMethodLbl=()=>{ tx(upTrig.firstChild,S.upscaleMethod==="rtx"?"RTX":"SeedVR2"); };
-      const _updUpBtnTitle=()=>{
-        _updUpMethodLbl();
-        const rtx=S.upscaleMethod==="rtx";
-        if(rtx){
-          upBtn.title="Upscale "+S.upscaleFactor+"x via RTX VSR\nNo model needed - uses your GPU's super resolution";
-          upBtn.classList.remove("warn");
-          return;
-        }
-        const d=S.models.upscaleDit, v=S.models.upscaleVae;
-        if(d&&d!=="none"&&v&&v!=="none"){
-          upBtn.title="Upscale "+S.upscaleFactor+"x via SeedVR2\nDiT: "+d+"\nVAE: "+v;
-          upBtn.classList.remove("warn");
-        }else{
-          upBtn.title="Upscale via SeedVR2\nNo upscale model selected - open Settings";
-          upBtn.classList.add("warn");
-        }
-      };
       galleryActs.append(
         actBtn("ui.favorite",()=>_favCurrent(),{icon:ICON_FAV}),
         actBtn("ui.open",()=>_openCurrent(),{icon:ICON_OPEN}),
-        upBtn,upFactorWrap,
         actBtn("ui.delete",()=>_delCurrent(),{icon:ICON_DEL,danger:true})
       );
       const saveTogBtn=mk("button",{}, {type:"button",className:"h3-actbtn"+(S.autoSave?" on":"")});
@@ -3228,10 +3169,6 @@ app.registerExtension({
       let _curItem=null;
       const _showVideo=(item,fromFinish)=>{
         _curItem=item;
-        if(_cmpMode) _exitCompare();
-        if(_upResult){
-          cmpBtn.style.display=item.filename===_upResult.filename?"block":"none";
-        }
         const vtype=item.type||"output";
         const url=api.apiURL(`/view?filename=${encodeURIComponent(item.filename)}&type=${vtype}&subfolder=${encodeURIComponent(item.subfolder||"")}`);
         vidEl.src=url;vidEl.style.display="block";
@@ -3267,48 +3204,6 @@ app.registerExtension({
         vidEl.src="";vidEl.style.display="none";placeholder.style.display="flex";
         _curItem=null;
         _loadGallery();
-      };
-      const _runUpscale=async()=>{
-        if(!_curItem||S.generating) return;
-        const rtx=S.upscaleMethod==="rtx";
-        if(!rtx && (!S.models.upscaleDit||S.models.upscaleDit==="none"||!S.models.upscaleVae||S.models.upscaleVae==="none")){
-          resetBtn();
-          showError(t("err.upscale.model"));
-          return;
-        }
-        _upscaleRun=rtx?"upscale-rtx":"upscale-seedvr2";
-        _upOrig=_curItem?{filename:_curItem.filename,subfolder:_curItem.subfolder||""}:null;
-        S.generating=true;
-        _activeGenStartTs=Date.now();
-        _activeShowTime=showTime;
-        _activeShowLatest=showLatest;
-        _activeShownFiles=[];
-        genBtn.disabled=true;tx(genBtnLbl,t("ui.upscaling"));
-        progWrap.style.display="flex";setStage("Preparing upscale...",3);
-        try{
-          const stage=await fetch("/h3one/stage_input",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:_curItem.filename,subfolder:_curItem.subfolder||""})});
-          const sd=await stage.json();
-          if(!sd.ok) throw new Error(sd.error||t("err.prep.upscale"));
-          const wf=await _fetchTpl(rtx?"upscale_rtx.json":"upscale.json");
-          wf["1"].inputs.file=sd.name;
-          if(rtx){
-            wf["3"].inputs["resize_type.scale"]=S.upscaleFactor;
-          }else{
-            wf["3"].inputs.model=S.models.upscaleDit;
-            wf["4"].inputs.model=S.models.upscaleVae;
-            const resMap={2:1080,3:1440,4:2160};
-            wf["5"].inputs.resolution=resMap[S.upscaleFactor]||1080;
-          }
-          _applyAutoSave(wf);
-          const body={prompt:wf,client_id:api.clientId,extra_data:{enable_previews:true}};
-          const res=await api.fetchApi("/prompt",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-          const data=await res.json();
-          if(data.error||!data.prompt_id) throw new Error(data.error?.message||"Unknown error");
-          _batchIds=[data.prompt_id];_batchDone=0;_activePromptId=data.prompt_id;
-          setStage(rtx?("Upscaling "+S.upscaleFactor+"x with RTX VSR..."):("Upscaling "+S.upscaleFactor+"x with SeedVR2 ("+S.models.upscaleDit+")..."),8);
-        }catch(e){
-          resetBtn();showError(fmtErr(e));
-        }
       };
       const _loadGallery=async()=>{
         galleryBox.innerHTML="";
@@ -3361,7 +3256,6 @@ app.registerExtension({
       const resetBtn=()=>{
         S.generating=false;
         _batchIds=[];_batchDone=0;
-        _upscaleRun="";
         _chainMode=false;_chainFinalizing=false;
         genBtn.disabled=false;
         tx(genBtnLbl,t("ui.generate"));
@@ -3385,25 +3279,17 @@ app.registerExtension({
         if(S.seed!==undefined&&S.seed!==null&&S.seed!=="") _seedByFile[item.filename]=S.seed;
         const genMs=Date.now()-_activeGenStartTs;
         _genTimeByFile[item.filename]=genMs;
-        const wasUpscale=_upscaleRun;
-        if(_upscaleRun&&_upOrig){
-          _upResult={filename:item.filename,subfolder:item.subfolder||""};
-        }
         _showVideo(item,true);
-        if(_upResult&&_upResult.filename===item.filename){
-          cmpBtn.style.display="block";
-        }
-        _upscaleRun="";
         _activeShownFiles.push(item.filename);
         const isTemp=item.type==="temp";
         if(!isTemp){
           fetch("/h3one/set_output",{method:"POST",headers:{"Content-Type":"application/json"},
             body:JSON.stringify({node_id:self.id,info:{filename:item.filename,subfolder:item.subfolder||""}})}).catch(()=>{});
-          const histMode=wasUpscale?("Upscale "+S.upscaleFactor+"x ("+(wasUpscale==="upscale-rtx"?"RTX VSR":"SeedVR2")+")"):S.mode;
-          const histRes=wasUpscale?(S.upscaleFactor+"x upscale"):S.resolution;
+          const histMode=S.mode;
+          const histRes=S.resolution;
           fetch("/h3one/history",{method:"POST",headers:{"Content-Type":"application/json"},
             body:JSON.stringify({
-              mode:histMode,quality:wasUpscale?"":S.quality,prompt:(S.prompt||"").slice(0,2000),duration:wasUpscale?0:S.duration,
+              mode:histMode,quality:S.quality,prompt:(S.prompt||"").slice(0,2000),duration:S.duration,
               resolution:histRes,seed:S.seed,gen_time:genMs,video:item.filename,subfolder:item.subfolder||"",
             })}).catch(()=>{});
         }
@@ -3508,6 +3394,7 @@ app.registerExtension({
           steps:S.steps,
           width:res.width,
           height:res.height,
+          latentUpscale:S.latentUpscale||{enabled:false},
           kf:(S.kf||[]).map(k=>({img:k.img||"",pos:Math.round(k.pos||0)})),
         };
         return JSON.stringify(fp);
@@ -3603,6 +3490,24 @@ app.registerExtension({
         });
       };
 
+      const _insertLatentUpscaler=(wf,samplerId="11",decodeId="12",nodeId="650")=>{
+        const up=S.latentUpscale;
+        if(!up || !up.enabled || !up.model || up.model==="none" || String(up.model).startsWith("(")) return;
+        wf[nodeId]={
+          class_type:"H3NestedLatentUpscaler",
+          inputs:{
+            latent:[samplerId,0],
+            model_name:up.model,
+            variant:up.variant==="3d"?"3D":"2D",
+            scale:Number(up.scale)||2.0,
+            device:up.device==="cpu"?"cpu":"cuda",
+            precision:["fp32","fp16","bf16"].includes(up.precision)?up.precision:"fp32",
+          },
+          _meta:{title:"Latent Upscaler"},
+        };
+        if(wf[decodeId]) wf[decodeId].inputs.samples=[nodeId,0];
+      };
+
       const _patchCommon=(wf)=>{
         wf["1"].inputs.clip_name=S.models.clip;
         const condNode=wf["6"];
@@ -3630,6 +3535,7 @@ app.registerExtension({
         _insertModelPatches(wf);
         _applyAutoSave(wf);
         _insertCacheBust(wf);
+        _insertLatentUpscaler(wf,"11","12","650");
         return {frames,res};
       };
 
@@ -3844,6 +3750,34 @@ app.registerExtension({
             mc.inputs.crop="disabled";
             trim.inputs.trim_frames=["c"+idx+":mc",1];
           }
+          const up=S.latentUpscale;
+          if(up && up.enabled && up.model && up.model!=="none" && !String(up.model).startsWith("(")){
+            const upId="c"+idx+":up";
+            const decodeUpId="c"+idx+":decodeUp";
+            const trimUpId="c"+idx+":trimUp";
+            out[upId]={
+              class_type:"H3NestedLatentUpscaler",
+              inputs:{
+                latent:["c"+idx+":sampler",0],
+                model_name:up.model,
+                variant:up.variant==="3d"?"3D":"2D",
+                scale:Number(up.scale)||2.0,
+                device:up.device==="cpu"?"cpu":"cuda",
+                precision:["fp32","fp16","bf16"].includes(up.precision)?up.precision:"fp32",
+              },
+              _meta:{title:"Latent Upscaler"},
+            };
+            out[decodeUpId]={class_type:"VAEDecode",inputs:{samples:[upId,0],vae:["s:3",0]},_meta:{title:"VAE Decode (Upscaled)"}};
+            out[trimUpId]={class_type:"MiniMaxH3MotionContextTrim",inputs:{
+              images:[decodeUpId,0],
+              trim_frames:trim.inputs.trim_frames,
+              audio:trim.inputs.audio,
+              fps:24,
+              match_tail:true,
+            },_meta:{title:"Trim (Upscaled)"}};
+            out["c"+idx+":video"].inputs.images=[trimUpId,0];
+            out["c"+idx+":video"].inputs.audio=[trimUpId,1];
+          }
           Object.assign(wf,out);
         });
         // shared model chain + patches (inserted once, into clip 0's copy)
@@ -3892,6 +3826,7 @@ app.registerExtension({
           const fp=JSON.stringify({
             chain:clips.map(c=>({prompt:_finalPrompt(c.prompt),duration:c.duration})),
             seed:S.seed||0,steps:S.steps,width:res.width,height:res.height,audioLock,files:fpFiles,
+            latentUpscale:S.latentUpscale||{enabled:false},
           });
           wf["s:bust"]={class_type:"H3CacheBust",inputs:{clip:["s:1",0],fingerprint:fp},_meta:{title:"Cache Invalidation"}};
           clips.forEach((_cl,idx)=>{
@@ -3907,9 +3842,6 @@ app.registerExtension({
 
       genBtn.onclick=async()=>{
         if(S.generating) return;
-        _upOrig=null;_upResult=null;
-        if(_cmpMode) _exitCompare();
-        cmpBtn.style.display="none";
         _activeNode=self;
         _activeShowOutput=showOutput;
         _activeResetBtn=resetBtn;
@@ -3932,6 +3864,9 @@ app.registerExtension({
         progWrap.style.display="flex";setStage("Building workflow...",3);
         errorBox.style.display="none";
         try{
+          if(S.latentUpscale.enabled && (!S.latentUpscale.model || S.latentUpscale.model==="none" || String(S.latentUpscale.model).startsWith("("))){
+            throw new Error(t("err.latent.model"));
+          }
           if(S.mode==="chain"){
             const wf=await _buildChain();
             _chainMode=true;
@@ -4012,19 +3947,17 @@ app.registerExtension({
           const loraItems=_M.loras.length?_M.loras:["none"];
           _renderLoras();
           try{
-            const sr=await fetch("/h3one/seedvr2_models");
+            const sr=await fetch("/h3one/latent_upscaler_models");
             const sd=await sr.json();
-            const _D=sd.dit||[], _V=sd.vae||[];
-            modelDDs.upscaleDit.updateItems(["none"].concat(_D));
-            modelDDs.upscaleVae.updateItems(["none"].concat(_V));
-            if(S.models.upscaleDit!=="none"&&!_D.some(m=>m===S.models.upscaleDit)&&_D.length){
-              S.models.upscaleDit=_D[0];modelDDs.upscaleDit.set(_D[0]);persist();
+            const items=["none"].concat(sd.models||[]);
+            if(latentUpscaleDD) latentUpscaleDD.updateItems(items);
+            if(S.latentUpscale.model!=="none" && (sd.models||[]).length && !(sd.models||[]).some(m=>m===S.latentUpscale.model)){
+              S.latentUpscale.model=sd.models[0];
+              S.models.latentUpscaleModel=sd.models[0];
+              if(latentUpscaleDD) latentUpscaleDD.set(S.latentUpscale.model);
+              persist();
             }
-            if(S.models.upscaleVae!=="none"&&!_V.some(m=>m===S.models.upscaleVae)&&_V.length){
-              S.models.upscaleVae=_V[0];modelDDs.upscaleVae.set(_V[0]);persist();
-            }
-          }catch(e){console.warn("[H3One] seedvr2 models:",e);}
-          _updUpBtnTitle();
+          }catch(e){console.warn("[H3One] latent upscaler models:",e);}
         }catch(e){console.warn("[H3One] load models:",e);}
       };
       const _loadConfig=async()=>{
@@ -4092,10 +4025,11 @@ app.registerExtension({
       };
       _updRecipe();
       _updRecipeFn=_updRecipe;
-      leftPanel.append(promptCard,modeCard,tuneCard,loraArea);
+      leftPanel.append(promptCard,modeCard,tuneCard,latentCard,loraArea);
       _applyFold("prompt",promptHdr,promptWrap,promptChev);
       _applyFold("mode",modeHdr,modeArea,modeChev);
       _applyFold("params",paramsHdr,tuneBody,paramsChev);
+      _applyFold("latent",latentHdr,latentBody,latentChev);
       _applyFold("lora",loraHdr,loraBody,loraChev);
       mainRow.append(leftPanel,rightPanel);
       pad.append(navRow,mainRow,genRow);

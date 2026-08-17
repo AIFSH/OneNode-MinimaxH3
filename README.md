@@ -64,9 +64,16 @@ Chain also accepts **image / video / audio references** (identity, motion, sound
 | **R2V** | Reference images / videos / audio drive the clip (ref2va model) |
 | **Keyframes** | Pin still images at arbitrary frame positions |
 | **Extend** | Continue an existing video seamlessly |
-| **Upscale** | RTX / SeedVR2 video super-resolution hook |
 
 The UI is available in **English** and **中文**, switchable from the toolbar.
+
+### Latent Upscaler
+
+An optional **Latent Upscaler** panel in the parameter area runs the generated
+latent through
+[Comfyui_Minimax_h3_latent_Upscaler](https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler)
+before VAE decode. Choose the checkpoint, 2D/3D variant, scale, device and
+precision; place the checkpoint in `ComfyUI/models/latent_upscale_models/`.
 
 ## Screenshots
 
@@ -74,7 +81,7 @@ The UI is available in **English** and **中文**, switchable from the toolbar.
 
 ![History](assets/history.png)
 
-**Library** — every output in one place: inline preview, favorites, open-folder, delete, RTX upscale hook.
+**Library** — every output in one place: inline preview, favorites, open-folder, delete.
 
 ![Library](assets/library.png)
 
@@ -101,6 +108,7 @@ Official MiniMax H3 files from [Comfy-Org/MiniMax-H3](https://huggingface.co/Com
 - **Chain / Keyframes / Extend:** [ComfyUI-H3-Motion-Context-MultiRef](https://github.com/seitanism/ComfyUI-H3-Motion-Context-MultiRef) — on ComfyUI 0.32, pin the tested commit `0719855` (current `main` requires ComfyUI PR #15439 / 0.33+). See [COMPATIBILITY.md](COMPATIBILITY.md).
 - **Audio Lock / Audio Drive:** comfyui-vrgamedevgirl
 - **Turbo preset:** [ComfyUI-MiniMax-H3-Turbo](https://github.com/Larryvrh/ComfyUI-MiniMax-H3-Turbo) + a turbo LoRA from [larryvrh/MiniMax-H3-Turbo-Lora](https://huggingface.co/larryvrh/MiniMax-H3-Turbo-Lora)
+- **Latent Upscaler:** [Comfyui_Minimax_h3_latent_Upscaler](https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler) — used by the optional Latent Upscaler panel.
 - **Optional (Speed / High Quality presets):** ComfyUI-SolAttn_triton, ComfyUI-MiniMaxH3-Cache, SageAttention
 
 Exact tested versions of everything are in **[COMPATIBILITY.md](COMPATIBILITY.md)** — check that file first if something breaks after you update ComfyUI or a pack.

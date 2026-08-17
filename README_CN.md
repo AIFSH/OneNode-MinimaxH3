@@ -63,9 +63,15 @@ Chain 也支持**图片 / 视频 / 音频参考素材**（身份、运动、配�
 | **R2V** | 用参考图片 / 视频 / 音频驱动片段（ref2va 模型） |
 | **Keyframes** | 在任意帧位置固定静态图片 |
 | **Extend** | 无缝续写已有视频 |
-| **Upscale** | RTX / SeedVR2 视频超分辨率入口 |
 
 界面支持 **English** 和 **中文**，可从工具栏切换。
+
+### Latent 放大
+
+参数区新增可选 **Latent 放大** 专栏。启用后，会在 VAE 解码前使用
+[Comfyui_Minimax_h3_latent_Upscaler](https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler)
+处理生成的 latent。可选择模型、2D/3D 版本、放大倍数、设备和精度；模型需放入
+`ComfyUI/models/latent_upscale_models/`。
 
 ## 截图
 
@@ -73,7 +79,7 @@ Chain 也支持**图片 / 视频 / 音频参考素材**（身份、运动、配�
 
 ![History](assets/history.png)
 
-**Library**——所有输出集中展示：内联预览、收藏、打开文件夹、删除、RTX 超分入口。
+**Library**——所有输出集中展示：内联预览、收藏、打开文件夹、删除。
 
 ![Library](assets/library.png)
 
@@ -100,6 +106,7 @@ Chain 也支持**图片 / 视频 / 音频参考素材**（身份、运动、配�
 - **Chain / Keyframes / Extend：** [ComfyUI-H3-Motion-Context-MultiRef](https://github.com/seitanism/ComfyUI-H3-Motion-Context-MultiRef)——在 ComfyUI 0.32 上请固定到已测试提交 `0719855`（当前 `main` 需要 ComfyUI PR #15439 / 0.33+）。详见 [COMPATIBILITY.md](COMPATIBILITY.md)。
 - **Audio Lock / Audio Drive：** comfyui-vrgamedevgirl
 - **Turbo 预设：** [ComfyUI-MiniMax-H3-Turbo](https://github.com/Larryvrh/ComfyUI-MiniMax-H3-Turbo) + 来自 [larryvrh/MiniMax-H3-Turbo-Lora](https://huggingface.co/larryvrh/MiniMax-H3-Turbo-Lora) 的 turbo LoRA
+- **Latent 放大：** [Comfyui_Minimax_h3_latent_Upscaler](https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler)——可选 Latent 放大专栏使用。
 - **可选（Speed / High Quality 预设）：** ComfyUI-SolAttn_triton、ComfyUI-MiniMaxH3-Cache、SageAttention
 
 所有经过测试的版本都记录在 **[COMPATIBILITY.md](COMPATIBILITY.md)**——更新 ComfyUI 或某个节点包后如果出现异常，请优先查看该文件。

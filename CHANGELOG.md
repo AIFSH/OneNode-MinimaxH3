@@ -75,4 +75,4 @@ All notable changes to this project are documented here, newest first.
 
 ## [0.1.0] — 2026-08-15
 
-- Initial release: T2V, I2V, R2V, Audio Drive, Keyframes, Extend, Chain, and Upscale in a single node.
+- Initial release: T2V, I2V, R2V, Audio Drive, Keyframes, Extend, Chain, and Latent Upscaler in a single node.

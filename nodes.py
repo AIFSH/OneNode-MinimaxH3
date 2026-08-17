@@ -75,8 +75,7 @@ USER_HISTORY_PATH = os.path.join(USER_CONFIG_DIR, "history.json")
 _VIDEO_EXTS = (".mp4", ".webm", ".gif", ".mkv", ".mov", ".m4v", ".avi")
 _ALLOWED_TEMPLATES = (
     "t2v.json", "i2v.json", "r2v.json", "audio_drive.json",
-    "keyframes.json", "video_extend.json", "chain_section.json", "upscale.json",
-    "upscale_rtx.json",
+    "keyframes.json", "video_extend.json", "chain_section.json",
 )
 
 
@@ -357,48 +356,18 @@ async def get_models(request):
     })
 
 
-@PromptServer.instance.routes.get("/h3one/seedvr2_models")
-async def get_seedvr2_models(request):
-    """SeedVR2 upscale models: DiT (diffusion transformer) + VAE. Scans the
-    models/SEEDVR2 folder (GGUF and safetensors both work), merged with the
-    pack's registry list - any registry entry auto-downloads on first use."""
-    _DIT_DEFAULTS = [
-        "seedvr2_ema_3b-Q4_K_M.gguf",
-        "seedvr2_ema_3b-Q8_0.gguf",
-        "seedvr2_ema_3b_fp8_e4m3fn.safetensors",
-        "seedvr2_ema_3b_fp16.safetensors",
-        "seedvr2_ema_7b-Q4_K_M.gguf",
-        "seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors",
-        "seedvr2_ema_7b_fp16.safetensors",
-        "seedvr2_ema_7b_sharp-Q4_K_M.gguf",
-        "seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors",
-        "seedvr2_ema_7b_sharp_fp16.safetensors",
-    ]
-    _VAE_DEFAULTS = ["ema_vae_fp16.safetensors"]
+@PromptServer.instance.routes.get("/h3one/latent_upscaler_models")
+async def get_latent_upscaler_models(request):
+    """List checkpoints available to the integrated latent upscaler.
+
+    The actual inference is provided by
+    Comfyui_Minimax_h3_latent_Upscaler. Its nodes scan
+    ComfyUI/models/latent_upscale_models for .safetensors/.pth files.
+    """
     try:
-        found_dit = []
-        found_vae = []
-        seed_dir = os.path.join(folder_paths.models_dir, "SEEDVR2")
-        if os.path.isdir(seed_dir):
-            for fn in os.listdir(seed_dir):
-                low = fn.lower()
-                if not low.endswith((".gguf", ".safetensors")):
-                    continue
-                if "vae" in low:
-                    found_vae.append(fn)
-                else:
-                    found_dit.append(fn)
-        dit = sorted(found_dit)
-        vae = sorted(found_vae)
-        for m in _DIT_DEFAULTS:
-            if m not in dit:
-                dit.append(m)
-        for m in _VAE_DEFAULTS:
-            if m not in vae:
-                vae.append(m)
-        return web.json_response({"dit": dit, "vae": vae})
+        return web.json_response({"models": _scan("latent_upscale_models", [".safetensors", ".pth"])})
     except Exception as e:
-        return web.json_response({"dit": [], "vae": [], "error": str(e)}, status=500)
+        return web.json_response({"models": [], "error": str(e)}, status=500)
 
 
 @PromptServer.instance.routes.get("/h3one/input_files")
@@ -668,8 +637,8 @@ async def get_gallery(request):
 
 @PromptServer.instance.routes.post("/h3one/stage_input")
 async def stage_input(request):
-    """Copy an existing output video into the input folder so LoadVideo can read it
-    (used by the upscale hook). Returns the input-folder filename."""
+    """Copy an existing output video into the input folder so LoadVideo can read it.
+    Returns the input-folder filename."""
     try:
         data = await request.json()
         filename = data.get("filename", "")
@@ -1122,12 +1091,93 @@ class H3AudioSlice:
         return (out,)
 
 
+class H3NestedLatentUpscaler:
+    """NestedTensor-aware wrapper around Comfyui_Minimax_h3_latent_Upscaler.
+
+    MiniMax H3 sampler outputs a comfy.nested_tensor.NestedTensor containing the
+    video latent (member 0) and the audio latent (member 1). The upstream 2D/3D
+    nodes assume a plain torch.Tensor and call .clone(), which fails on the nested
+    value. This wrapper unpacks the nested value, sends only the video tensor to
+    the upstream node, then rebuilds the original NestedTensor with the untouched
+    audio members.
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "latent": ("LATENT",),
+                "model_name": ("STRING", {"default": "none"}),
+                "variant": (["2D", "3D"], {"default": "2D"}),
+                "scale": ("FLOAT", {"default": 2.0, "min": 1.0, "max": 4.0, "step": 0.1}),
+                "device": (["cuda", "cpu"], {"default": "cuda"}),
+                "precision": (["fp32", "fp16", "bf16"], {"default": "fp32"}),
+            }
+        }
+
+    RETURN_TYPES = ("LATENT",)
+    RETURN_NAMES = ("latent",)
+    FUNCTION = "run"
+    CATEGORY = "One Node"
+
+    def run(self, latent, model_name="none", variant="2D", scale=2.0, device="cuda", precision="fp32"):
+        if not isinstance(latent, dict) or "samples" not in latent:
+            return (latent,)
+        if not model_name or model_name == "none" or str(model_name).startswith("("):
+            raise ValueError("请选择 latent upscaler 模型")
+
+        import torch
+        samples = latent["samples"]
+        nested = False
+        members = None
+        nested = bool(getattr(samples, "is_nested", False)) or type(samples).__name__ == "NestedTensor"
+        if nested:
+            members = list(samples.unbind())
+            if not members or not isinstance(members[0], torch.Tensor):
+                raise ValueError("NestedTensor 没有可用的视频 latent")
+
+        video = members[0] if nested else samples
+        suffix = "3d" if str(variant).lower().startswith("3") else "2d"
+        module_name = (
+            "Comfyui_Minimax_h3_latent_Upscaler.nodes."
+            "minimax_h3_latent_upscaler_" + suffix
+        )
+        try:
+            import importlib
+            mod = importlib.import_module(module_name)
+        except Exception as e:
+            raise RuntimeError(
+                "无法导入 Comfyui_Minimax_h3_latent_Upscaler，请确认该扩展已安装: " + module_name
+            ) from e
+
+        node_cls = getattr(
+            mod,
+            "MinimaxH3LatentUpscalerNode" + ("3D" if suffix == "3d" else "2D"),
+        )
+        up_result = node_cls().run(
+            {"samples": video},
+            model_name,
+            scale,
+            device,
+            precision,
+        )
+        up_samples = up_result[0]["samples"] if isinstance(up_result, tuple) else up_result
+
+        out = dict(latent)
+        if nested:
+            out["samples"] = type(samples)([up_samples, *members[1:]])
+        else:
+            out["samples"] = up_samples
+        return (out,)
+
+
 NODE_CLASS_MAPPINGS = {
     "H3OneNode": H3OneNode,
     "H3CacheBust": H3CacheBust,
     "H3IdentityAnchor": H3IdentityAnchor,
     "H3AudioTrim": H3AudioTrim,
     "H3AudioSlice": H3AudioSlice,
+    "H3NestedLatentUpscaler": H3NestedLatentUpscaler,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "H3OneNode": "ALL in ONE MiniMaxH3",
@@ -1135,4 +1185,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "H3IdentityAnchor": "H3 Identity Anchor (internal)",
     "H3AudioTrim": "H3 Audio Trim (internal)",
     "H3AudioSlice": "H3 Audio Slice (internal)",
+    "H3NestedLatentUpscaler": "H3 Nested Latent Upscaler (internal)",
 }
