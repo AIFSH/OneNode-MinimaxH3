@@ -1,7 +1,12 @@
-# ComfyUI ALL-in-ONE MiniMax H3
+# OneNode-MinimaxH3
 
 ![Status: Beta](https://img.shields.io/badge/status-beta-orange)
 ![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)
+
+> **Fork notice:** This project is a fork of
+> [LeonQ8/ComfyUI-ALLinONE-MinimaxH3](https://github.com/LeonQ8/ComfyUI-ALLinONE-MinimaxH3).
+
+> **中文说明：** 完整中文文档请见 [README_CN.md](README_CN.md)。
 
 One node. The whole MiniMax H3 video pipeline — including **long videos driven by a single audio track**.
 
@@ -104,7 +109,7 @@ Exact tested versions of everything are in **[COMPATIBILITY.md](COMPATIBILITY.md
 
 ```bash
 # inside ComfyUI/custom_nodes/
-git clone https://github.com/AIFSH/ComfyUI-ALLinONE-MinimaxH3.git
+git clone https://github.com/AIFSH/OneNode-MinimaxH3.git
 ```
 
 Restart ComfyUI, then double-click the canvas and search for **ALL in ONE MiniMaxH3**.
@@ -131,7 +136,7 @@ I develop and test against a pinned stack (ComfyUI version, custom node commits,
 
 ## Support
 
-This node is in **beta** — if something breaks, please [open an issue](https://github.com/AIFSH/ComfyUI-ALLinONE-MinimaxH3/issues), it's the fastest way to get it fixed.
+This node is in **beta** — if something breaks, please [open an issue](https://github.com/AIFSH/OneNode-MinimaxH3/issues), it's the fastest way to get it fixed.
 
 **Follow the WeChat official account:** the settings panel shows the QR code directly. Drop your QR image at `web/wechat_qr.png` (or `assets/wechat_qr.png`; `.jpg`/`.jpeg`/`.webp`/`.gif` also work) — it's served through the node's `/h3one/wechat_qr` endpoint, and the format is detected from the file content.
 
