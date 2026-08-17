@@ -137,7 +137,11 @@ git clone https://github.com/AIFSH/OneNode-MinimaxH3.git
 
 本项目目前处于 **beta** 阶段——如果出现问题，请 [提交 Issue](https://github.com/AIFSH/OneNode-MinimaxH3/issues)，这是最快获得修复的方式。
 
-**关注微信公众号：** 设置面板会直接显示二维码。将二维码图片放到 `web/wechat_qr.png`（或 `assets/wechat_qr.png`；也支持 `.jpg` / `.jpeg` / `.webp` / `.gif`），节点会通过 `/h3one/wechat_qr` 端点提供该图片，图片格式会根据文件内容自动识别。
+**关注微信公众号：**
+
+![微信公众号二维码](web/wechat_qr.png)
+
+设置面板会直接显示二维码。将二维码图片放到 `web/wechat_qr.png`（或 `assets/wechat_qr.png`；也支持 `.jpg` / `.jpeg` / `.webp` / `.gif`），节点会通过 `/h3one/wechat_qr` 端点提供该图片，图片格式会根据文件内容自动识别。
 
 ## 许可证
 

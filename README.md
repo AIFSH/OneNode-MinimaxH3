@@ -138,7 +138,11 @@ I develop and test against a pinned stack (ComfyUI version, custom node commits,
 
 This node is in **beta** — if something breaks, please [open an issue](https://github.com/AIFSH/OneNode-MinimaxH3/issues), it's the fastest way to get it fixed.
 
-**Follow the WeChat official account:** the settings panel shows the QR code directly. Drop your QR image at `web/wechat_qr.png` (or `assets/wechat_qr.png`; `.jpg`/`.jpeg`/`.webp`/`.gif` also work) — it's served through the node's `/h3one/wechat_qr` endpoint, and the format is detected from the file content.
+**Follow the WeChat official account:**
+
+![WeChat official account QR code](web/wechat_qr.png)
+
+The settings panel shows the QR code directly. Drop your QR image at `web/wechat_qr.png` (or `assets/wechat_qr.png`; `.jpg`/`.jpeg`/`.webp`/`.gif` also work) — it's served through the node's `/h3one/wechat_qr` endpoint, and the format is detected from the file content.
 
 ## License
 
