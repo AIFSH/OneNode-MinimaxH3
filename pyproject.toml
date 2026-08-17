@@ -1,0 +1,20 @@
+[project]
+name = "one-node-minimax-h3"
+description = "All-in-one MiniMax H3 video generation for ComfyUI: T2V, I2V, R2V, audio drive, custom keyframes, video extension and Motion Context chains in a single node."
+version = "0.2.0"
+authors = [{ name = "AIFSH" }]
+# The Motion Context / keyframes / extension wiring is derived from the GPL-3.0
+# ComfyUI-H3-Motion-Context-MultiRef fork, so this pack ships GPL-3.0.
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+classifiers = [
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Repository = "https://github.com/AIFSH/ComfyUI-ALLinONE-MinimaxH3"
+Documentation = "https://github.com/AIFSH/ComfyUI-ALLinONE-MinimaxH3#readme"
+
+[tool.comfy]
+PublisherId = "aifsh"
+DisplayName = "ALL in ONE MiniMaxH3"
