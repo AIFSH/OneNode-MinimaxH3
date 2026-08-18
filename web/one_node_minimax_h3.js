@@ -2,7 +2,7 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
 const ACCENT_DEFAULT = "#c0a996";
-const WECHAT_QR_PATH = "/h3one/wechat_qr.png";
+const WECHAT_QR_PATH = "/h3one/wechat_qr";
 const C = {
   lime:ACCENT_DEFAULT, bg0:"#080808", bg1:"#101010", bg2:"#1c1c1c",
   bg3:"#2a2a2a", border:"#4c4c4c", borderH:"#5f5f5f",
@@ -94,6 +94,8 @@ const I18N = {
     "tip.sigma.refine": "Low-sigma detail refinement (from ComfyUI-YCNodes-MiniMax-H3).\nAdds extra smoothing steps at the low-noise tail of the schedule to remove pixel grain / flicker on fast-moving edges.\n0 = off. Default 1. Thresholds and spacing use defaults (start 0.7, end 0.0, cosine).",
     "ui.dual": "Second Pass",
     "tip.dual": "Second-pass latent refinement (双采), parameters are automatic.\nDefault: pass 1 renders the full clip, then a second sampler partially re-denoises the same packed video+audio latent (10 steps at denoise 0.4).\nWith the Latent Upscaler enabled, T2V / R2V switch to the RunningHub 一采-放大-二采 split-schedule layout: the raw schedule is split in half — pass 1 runs the high-sigma head at base resolution with the Sigma Refiner's extra detail steps, the video latent is upscaled (from pass 1's clean estimate, 3D upscaler at fp16), and pass 2 finishes the low-sigma tail at the upscaled resolution (sampler forced to euler, matching the reference workflow; R2V drops its frame-0 anchor here).\nIn Chain with the upscaler enabled it uses the same split schedule: all clips run the high-sigma head at base resolution first (continuity stays on those clean base latents), then a gated final stage upscales each clip and runs the low-sigma tail — pass 2 uses the base conditioning (no motion-context keyframes) because H3 keyframe rows scale with the canvas and cannot be re-sampled after upscaling. I2V / Keyframes keep the upscaler on the output side for the same reason.\nOff by default — roughly doubles sampling time when enabled.",
+    "ui.enhance": "Enhance (Sigma + Upscale + 2nd Pass)",
+    "tip.enhance": "One switch for the three quality refinements.\nON: Sigma Refiner (low-noise detail pass) + Latent Upscale (spatial HxW upscale) + Second Pass (双采 latent refinement).\nOFF: all three are disabled.",
     "ui.advanced": "Advanced",
     "ui.loras.none": "LoRAs — none loaded",
     "ui.loras.loaded": "LoRAs — {n} loaded",
@@ -302,6 +304,8 @@ const I18N = {
     "tip.sigma.refine": "低噪细节精修（源自 ComfyUI-YCNodes-MiniMax-H3）。\n在噪声调度的低噪尾部增加平滑步数，消除高速运动边缘的像素颗粒与闪烁。\n0 = 关闭。默认 1。阈值与分布曲线使用默认值（起始 0.7、结束 0.0、cosine）。",
     "ui.dual": "二次采样",
     "tip.dual": "第二遍潜空间精修（双采），参数全自动。\n默认：第一遍完整 denoise 渲染全片，第二遍采样器在同一份打包的视频+音频 latent 上做局部重绘（10 步、denoise 0.4）。\n同时开启 Latent 放大时，T2V / R2V 切换为 RunningHub 的「一采-放大-二采」拆分调度：原始调度自动对半拆分——第一遍在基础分辨率跑高 sigma 头部（Sigma 精修的加步也作用在第一遍），视频 latent 从第一遍的干净估计（denoised_output）放大（3D、fp16），第二遍在放大分辨率跑低 sigma 尾部（采样器强制 euler，与参考工作流一致；R2V 此时不插入第 0 帧锚点）。\nChain 开启放大时同样用拆分调度：所有片段先在基础分辨率跑高 sigma 头部（连续性沿用干净基础 latent），受门控的最终阶段再逐片段放大并跑低 sigma 尾部——二采使用基础 conditioning 引导器（不含 MotionContext 关键帧），因为 H3 关键帧行数随画布缩放、放大后无法再采样。I2V / Keyframes 仍保持输出侧放大。\n默认关闭——开启后采样时间约翻倍。",
+    "ui.enhance": "增强（Sigma 精修 + 放大 + 二采）",
+    "tip.enhance": "一个开关同时控制三项画质增强。\n开：Sigma 精修（低噪细节）+ Latent 放大（空间 H×W 放大）+ 二次采样（双采潜空间精修）。\n关：三项全部关闭。",
     "ui.advanced": "高级",
     "ui.loras.none": "LoRA — 未加载",
     "ui.loras.loaded": "LoRA — 已加载 {n} 个",
@@ -1321,6 +1325,7 @@ app.registerExtension({
           // exposes the enable toggle.
           dualSteps:       DUAL_SAMPLING_DEFAULTS.steps,
           dualDenoise:     DUAL_SAMPLING_DEFAULTS.denoise,
+          enhance:         (saved.enhance!==undefined)?!!saved.enhance:(!!saved.dualPass || !!(saved.latentUpscale&&saved.latentUpscale.enabled)),
           customW:         saved.customW||960,
           customH:         saved.customH||544,
           latentUpscale:   (saved.latentUpscale&&typeof saved.latentUpscale==="object")
@@ -1342,7 +1347,22 @@ app.registerExtension({
         };
       }
       const S=self._h3_S;
+      let _latentModels=[];
       const _upscaleOn=()=>!!(S.latentUpscale&&S.latentUpscale.enabled&&S.latentUpscale.model&&S.latentUpscale.model!=="none"&&!String(S.latentUpscale.model).startsWith("("));
+      const _applyEnhance=()=>{
+        if(S.enhance){
+          const cfg=(S.sigmaRefineCfg&&typeof S.sigmaRefineCfg==="object")?S.sigmaRefineCfg:{};
+          const steps=(typeof cfg.extra_steps==="number")?cfg.extra_steps:SIGMA_REFINE_DEFAULTS.extra_steps;
+          S.sigmaRefine=Math.max(0,Math.min(15,Math.round(steps)));
+          S.dualPass=true;
+          S.latentUpscale.enabled=true;
+        } else {
+          S.sigmaRefine=0;
+          S.dualPass=false;
+          S.latentUpscale.enabled=false;
+        }
+      };
+      _applyEnhance();
       if(S.audioLock){
         const af=_validAudioName(S.audioFile);
         if(!af && Array.isArray(S.refAudios)){
@@ -1388,6 +1408,7 @@ app.registerExtension({
           soundEnabled:S.soundEnabled,sound:S.sound,accent:S.accent,mcLength:S.mcLength,
           sigmaRefine:S.sigmaRefine,sigmaRefineCfg:S.sigmaRefineCfg,
           dualPass:S.dualPass,
+          enhance:S.enhance,
           latentUpscale:S.latentUpscale,
           modeSettings:S.modeSettings,
           autoSave:S.autoSave,customW:S.customW,customH:S.customH,
@@ -1642,8 +1663,8 @@ app.registerExtension({
       qrBox.append(qrImg,qrPh);
       const qrCands=[
         api.apiURL(WECHAT_QR_PATH),
-        api.apiURL("/extensions/ComfyUI-ALLinONE-MinimaxH3/wechat_qr.png"),
-        "/extensions/ComfyUI-ALLinONE-MinimaxH3/wechat_qr.png",
+        api.apiURL("/extensions/OneNode-MinimaxH3/wechat_qr.png"),
+        "/extensions/OneNode-MinimaxH3/wechat_qr.png",
       ];
       let qrIdx=0;
       const qrTryNext=()=>{
@@ -2835,31 +2856,7 @@ app.registerExtension({
       schedCapRow.append(schedCap,infoIcon("tip.scheduler"));
       const schedDD=DD(["simple","sgm_uniform","karras","exponential","ddim_uniform","beta","normal","linear_quadratic","kl_optimal","bong_tangent","beta57"],S.schedulerName||"simple",v=>{S.schedulerName=v;persist();});
       schedRow.append(schedCapRow,schedDD.el);
-      const sigmaRow=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
-      const sigmaCapRow=mk("div",{display:"flex",alignItems:"center",gap:"4px"});
-      const sigmaCap=mk("div",{fontSize:"10px",color:C.text});_tr(sigmaCap,"ui.sigma.refine");
-      sigmaCapRow.append(sigmaCap,infoIcon("tip.sigma.refine"));
-      const sigmaInner=mk("div",{display:"flex",alignItems:"center",gap:"8px"});
-      const sigmaRange=mk("input",{flex:"1",minWidth:"0",height:"16px",cursor:"pointer",accentColor:"var(--h3accent)",margin:"0"},{type:"range",min:"0",max:"15",step:"1",value:String(S.sigmaRefine)});
-      const sigmaVal=mk("div",{fontSize:"11px",color:C.lime,width:"16px",textAlign:"right",flexShrink:"0",fontVariantNumeric:"tabular-nums"});
-      tx(sigmaVal,String(S.sigmaRefine));
-      sigmaRange.oninput=()=>{
-        const v=Math.round(Number(sigmaRange.value)||0);
-        S.sigmaRefine=Math.max(0,Math.min(15,v));
-        tx(sigmaVal,String(S.sigmaRefine));
-        persist();
-      };
-      sigmaInner.append(sigmaRange,sigmaVal);
-      sigmaRow.append(sigmaCapRow,sigmaInner);
-      const dualRow=mk("div",{display:"flex",flexDirection:"column",gap:"2px"});
-      const dualToggle=Toggle("ui.dual", !!S.dualPass, v=>{
-        S.dualPass=!!v;
-        persist();
-      }, "tip.dual");
-      dualToggle.el.style.borderBottom="none";
-      dualToggle.el.style.padding="6px 0";
-      dualRow.append(dualToggle.el);
-      params.append(resRow,durRow,stepsRow,qualRow,samplerRow,schedRow,sigmaRow,dualRow);
+      params.append(resRow,durRow,stepsRow,qualRow,samplerRow,schedRow);
       const _saveModeState=()=>{
         S.modeSettings[S.mode]={
           prompt:S.prompt,steps:S.steps,quality:S.quality,resolution:S.resolution,duration:S.duration,
@@ -2911,6 +2908,78 @@ app.registerExtension({
       tx(loraChev,"▾");
       loraHdr.append(loraTitle,loraSub,loraChev);
       const loraBody=mk("div",{display:"flex",flexDirection:"column",gap:"5px"});
+      // -- Combined enhance switch (sigma refine + latent upscale + second pass) --
+      const enhanceWrap=mk("div",{display:"flex",flexDirection:"column",gap:"7px",padding:"6px 0",borderBottom:`1px solid ${C.border}`,marginBottom:"2px"});
+      const enhanceToggle=Toggle("ui.enhance", !!S.enhance, v=>{
+        S.enhance=!!v;
+        _applyEnhance();
+        if(S.enhance && _latentModels.length && (!S.latentUpscale.model || S.latentUpscale.model==="none" || String(S.latentUpscale.model).startsWith("("))){
+          S.latentUpscale.model=_latentModels[0];
+          S.models.latentUpscaleModel=_latentModels[0];
+          if(latentUpscaleDD) latentUpscaleDD.set(S.latentUpscale.model);
+        }
+        _syncEnhanceUI();
+        persist();
+      }, "tip.enhance");
+      enhanceToggle.el.style.borderBottom="none";
+      enhanceToggle.el.style.padding="4px 0";
+      enhanceWrap.appendChild(enhanceToggle.el);
+      const enhanceLatentWrap=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
+      const enhanceLatentCap=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:C.muted});
+      _tr(enhanceLatentCap,"ui.latent.model");
+      enhanceLatentWrap.appendChild(enhanceLatentCap);
+      const latentUpscaleDD=DD(["none"],S.latentUpscale.model,v=>{
+        S.latentUpscale.model=v;S.models.latentUpscaleModel=v;persist();
+      });
+      enhanceLatentWrap.appendChild(latentUpscaleDD.el);
+      enhanceWrap.appendChild(enhanceLatentWrap);
+      const enhanceGrid=mk("div",{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"7px"});
+      const eVarWrap=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
+      const eVarCapRow=mk("div",{display:"flex",alignItems:"center",gap:"4px"});
+      const eVarCap=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:C.muted});
+      _tr(eVarCap,"ui.latent.variant");
+      eVarCapRow.append(eVarCap,infoIcon("tip.latent.variant"));
+      eVarWrap.appendChild(eVarCapRow);
+      const eVarDD=DD(["2D","3D"],S.latentUpscale.variant==="3d"?"3D":"2D",v=>{
+        S.latentUpscale.variant=v==="3D"?"3d":"2d";persist();
+      });
+      eVarWrap.appendChild(eVarDD.el);
+      const eScaleWrap=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
+      const eScaleCapRow=mk("div",{display:"flex",alignItems:"center",gap:"4px"});
+      const eScaleCap=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:C.muted});
+      _tr(eScaleCap,"ui.latent.scale");
+      eScaleCapRow.append(eScaleCap,infoIcon("tip.latent.scale"));
+      eScaleWrap.appendChild(eScaleCapRow);
+      const eScaleNI=NI("",S.latentUpscale.scale,1.0,4.0,0.1,v=>{
+        S.latentUpscale.scale=Math.round(v*10)/10;persist();
+      },"100%");
+      eScaleWrap.appendChild(eScaleNI);
+      const eDevWrap=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
+      const eDevCap=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:C.muted});
+      _tr(eDevCap,"ui.latent.device");
+      eDevWrap.appendChild(eDevCap);
+      const eDevDD=DD(["cuda","cpu"],S.latentUpscale.device,v=>{
+        S.latentUpscale.device=v;persist();
+      });
+      eDevWrap.appendChild(eDevDD.el);
+      const ePrecWrap=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
+      const ePrecCap=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:C.muted});
+      _tr(ePrecCap,"ui.latent.precision");
+      ePrecWrap.appendChild(ePrecCap);
+      const ePrecDD=DD(["fp32","fp16","bf16"],S.latentUpscale.precision,v=>{
+        S.latentUpscale.precision=v;persist();
+      });
+      ePrecWrap.appendChild(ePrecDD.el);
+      enhanceGrid.append(eVarWrap,eScaleWrap,eDevWrap,ePrecWrap);
+      enhanceWrap.appendChild(enhanceGrid);
+      const _syncEnhanceUI=()=>{
+        const on=S.enhance;
+        enhanceLatentWrap.style.display=on?"flex":"none";
+        enhanceGrid.style.display=on?"grid":"none";
+        enhanceToggle._setChecked(on);
+      };
+      _syncEnhanceUI();
+      loraBody.appendChild(enhanceWrap);
       const loraRowsWrap=mk("div",{display:"flex",flexDirection:"column",gap:"5px"});
       loraBody.appendChild(loraRowsWrap);
       const addLoraBtn=mk("button",{background:"transparent",border:`1px dashed rgba(var(--h3accent-rgb),.4)`,borderRadius:"6px",padding:"4px 12px",fontSize:"9px",fontWeight:"700",color:"rgba(var(--h3accent-rgb),.7)",cursor:"pointer",outline:"none",alignSelf:"flex-start"});
@@ -2968,78 +3037,6 @@ app.registerExtension({
         _tr(loraSub, _n?"ui.loras.loaded":"ui.loras.none", _n?{n:_n}:null);
       };
       _renderLoras();
-
-      // -- Latent upscaler panel ----------------------------------------------
-      const latentCard=mk("div",{}, {className:"h3-card"});
-      const latentHdr=mk("div",{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",userSelect:"none"});
-      const latentTitle=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".1em",textTransform:"uppercase",color:C.muted});
-      _tr(latentTitle,"ui.latent.upscaler");
-      const latentChev=mk("span",{color:C.dim,fontSize:"10px",flexShrink:"0"});
-      tx(latentChev,"▾");
-      latentHdr.append(latentTitle,latentChev);
-      const latentBody=mk("div",{display:"flex",flexDirection:"column",gap:"7px"});
-      const latentToggle=Toggle("ui.latent.enabled",S.latentUpscale.enabled,v=>{
-        S.latentUpscale.enabled=v;persist();_updLatentUI();
-      });
-      latentBody.appendChild(latentToggle.el);
-      const latentModelWrap=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
-      const latentModelCap=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:C.muted});
-      _tr(latentModelCap,"ui.latent.model");
-      latentModelWrap.appendChild(latentModelCap);
-      const latentUpscaleDD=DD(["none"],S.latentUpscale.model,v=>{
-        S.latentUpscale.model=v;S.models.latentUpscaleModel=v;persist();_updLatentUI();
-      });
-      latentModelWrap.appendChild(latentUpscaleDD.el);
-      latentBody.appendChild(latentModelWrap);
-      const latentGrid=mk("div",{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"7px"});
-      const latentVarWrap=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
-      const latentVarCapRow=mk("div",{display:"flex",alignItems:"center",gap:"4px"});
-      const latentVarCap=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:C.muted});
-      _tr(latentVarCap,"ui.latent.variant");
-      latentVarCapRow.append(latentVarCap,infoIcon("tip.latent.variant"));
-      latentVarWrap.appendChild(latentVarCapRow);
-      const latentVarDD=DD(["2D","3D"],S.latentUpscale.variant==="3d"?"3D":"2D",v=>{
-        S.latentUpscale.variant=v==="3D"?"3d":"2d";persist();_updLatentUI();
-      });
-      latentVarWrap.appendChild(latentVarDD.el);
-      const latentScaleWrap=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
-      const latentScaleCapRow=mk("div",{display:"flex",alignItems:"center",gap:"4px"});
-      const latentScaleCap=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:C.muted});
-      _tr(latentScaleCap,"ui.latent.scale");
-      latentScaleCapRow.append(latentScaleCap,infoIcon("tip.latent.scale"));
-      latentScaleWrap.appendChild(latentScaleCapRow);
-      const latentScaleNI=NI("",S.latentUpscale.scale,1.0,4.0,0.1,v=>{
-        S.latentUpscale.scale=Math.round(v*10)/10;persist();_updLatentUI();
-      },"100%");
-      latentScaleWrap.appendChild(latentScaleNI);
-      const latentDevWrap=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
-      const latentDevCap=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:C.muted});
-      _tr(latentDevCap,"ui.latent.device");
-      latentDevWrap.appendChild(latentDevCap);
-      const latentDevDD=DD(["cuda","cpu"],S.latentUpscale.device,v=>{
-        S.latentUpscale.device=v;persist();_updLatentUI();
-      });
-      latentDevWrap.appendChild(latentDevDD.el);
-      const latentPrecWrap=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
-      const latentPrecCap=mk("div",{fontSize:"9px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:C.muted});
-      _tr(latentPrecCap,"ui.latent.precision");
-      latentPrecWrap.appendChild(latentPrecCap);
-      const latentPrecDD=DD(["fp32","fp16","bf16"],S.latentUpscale.precision,v=>{
-        S.latentUpscale.precision=v;persist();_updLatentUI();
-      });
-      latentPrecWrap.appendChild(latentPrecDD.el);
-      latentGrid.append(latentVarWrap,latentScaleWrap,latentDevWrap,latentPrecWrap);
-      latentBody.appendChild(latentGrid);
-      const latentHint=mk("div",{fontSize:"8px",color:C.muted,lineHeight:"1.5"});
-      _tr(latentHint,"ui.latent.hint");
-      latentBody.appendChild(latentHint);
-      latentCard.append(latentHdr,latentBody);
-      const _updLatentUI=()=>{
-        const on=S.latentUpscale.enabled;
-        latentBody.style.opacity=on?"1":".45";
-        latentToggle._setChecked(on);
-      };
-      _updLatentUI();
 
       // -- Seed row (inside the Tune card) ------------------------------------
       const seedBody=mk("div",{display:"flex",flexDirection:"column",gap:"5px"});
@@ -4242,8 +4239,15 @@ app.registerExtension({
             const sr=await fetch("/h3one/latent_upscaler_models");
             const sd=await sr.json();
             const items=["none"].concat(sd.models||[]);
+            _latentModels=sd.models||[];
             if(latentUpscaleDD) latentUpscaleDD.updateItems(items);
             if(S.latentUpscale.model!=="none" && (sd.models||[]).length && !(sd.models||[]).some(m=>m===S.latentUpscale.model)){
+              S.latentUpscale.model=sd.models[0];
+              S.models.latentUpscaleModel=sd.models[0];
+              if(latentUpscaleDD) latentUpscaleDD.set(S.latentUpscale.model);
+              persist();
+            }
+            if(S.enhance && (!S.latentUpscale.model || S.latentUpscale.model==="none" || String(S.latentUpscale.model).startsWith("(")) && (sd.models||[]).length){
               S.latentUpscale.model=sd.models[0];
               S.models.latentUpscaleModel=sd.models[0];
               if(latentUpscaleDD) latentUpscaleDD.set(S.latentUpscale.model);
@@ -4270,22 +4274,14 @@ app.registerExtension({
           if(saved.sigmaRefine===undefined && d.sigma_refiner && typeof d.sigma_refiner==="object"){
             const cfg=Object.assign({}, SIGMA_REFINE_DEFAULTS, S.sigmaRefineCfg||{}, d.sigma_refiner);
             S.sigmaRefineCfg=cfg;
-            if(typeof cfg.extra_steps==="number"){
-              S.sigmaRefine=Math.max(0,Math.min(15,Math.round(cfg.extra_steps)));
-              sigmaRange.value=String(S.sigmaRefine);
-              tx(sigmaVal,String(S.sigmaRefine));
-              persist();
-            }
+            if(S.enhance) _applyEnhance();
           }
           if(saved.dualPass===undefined && d.dual_sampling && typeof d.dual_sampling==="object"){
             const dd=Object.assign({}, DUAL_SAMPLING_DEFAULTS, d.dual_sampling);
-            S.dualPass=!!dd.enabled;
             // Parameters stay automatic: only the built-in defaults can vary
             // through config; there is no per-user control.
             S.dualSteps=Math.max(1,Math.min(60,Math.round(Number(dd.steps)||DUAL_SAMPLING_DEFAULTS.steps)));
             S.dualDenoise=Math.max(0.05,Math.min(1,Number(dd.denoise)||DUAL_SAMPLING_DEFAULTS.denoise));
-            dualToggle._setChecked(S.dualPass);
-            persist();
           }
           _discTmpl=d.prompt_templates||{};
         }catch(e){
@@ -4337,11 +4333,10 @@ app.registerExtension({
       };
       _updRecipe();
       _updRecipeFn=_updRecipe;
-      leftPanel.append(promptCard,modeCard,tuneCard,latentCard,loraArea);
+      leftPanel.append(promptCard,modeCard,tuneCard,loraArea);
       _applyFold("prompt",promptHdr,promptWrap,promptChev);
       _applyFold("mode",modeHdr,modeArea,modeChev);
       _applyFold("params",paramsHdr,tuneBody,paramsChev);
-      _applyFold("latent",latentHdr,latentBody,latentChev);
       _applyFold("lora",loraHdr,loraBody,loraChev);
       mainRow.append(leftPanel,rightPanel);
       pad.append(navRow,mainRow,genRow);
