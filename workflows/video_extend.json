@@ -9,7 +9,8 @@
   "8": { "class_type": "RandomNoise", "inputs": { "noise_seed": 0 }, "_meta": { "title": "Noise" } },
   "9": { "class_type": "BasicScheduler", "inputs": { "model": ["5", 0], "scheduler": "simple", "steps": 30, "denoise": 1 }, "_meta": { "title": "Scheduler" } },
   "10": { "class_type": "KSamplerSelect", "inputs": { "sampler_name": "res_multistep" }, "_meta": { "title": "Sampler" } },
-  "11": { "class_type": "SamplerCustomAdvanced", "inputs": { "noise": ["8", 0], "guider": ["7", 0], "sampler": ["10", 0], "sigmas": ["9", 0], "latent_image": ["18", 0] }, "_meta": { "title": "Sampler Custom Advanced" } },
+  "11": { "class_type": "SamplerCustomAdvanced", "inputs": { "noise": ["8", 0], "guider": ["7", 0], "sampler": ["10", 0], "sigmas": ["99", 0], "latent_image": ["18", 0] }, "_meta": { "title": "Sampler Custom Advanced" } },
+  "99": { "class_type": "H3OneSigmaRefiner", "inputs": { "sigmas": ["9", 0], "extra_steps": 1, "start_at_sigma": 0.7, "end_at_sigma": 0.0, "spacing": "cosine" }, "_meta": { "title": "Sigma Refiner" } },
   "12": { "class_type": "VAEDecode", "inputs": { "samples": ["11", 0], "vae": ["3", 0] }, "_meta": { "title": "VAE Decode" } },
   "13": { "class_type": "VAEDecodeAudio", "inputs": { "samples": ["11", 0], "vae": ["4", 0] }, "_meta": { "title": "VAE Decode Audio" } },
   "14": { "class_type": "CreateVideo", "inputs": { "images": ["20", 0], "fps": 24, "audio": ["20", 1], "bit_depth": 8 }, "_meta": { "title": "Create Video" } },
@@ -20,4 +21,3 @@
   "19": { "class_type": "MiniMaxH3MotionContextTrim", "inputs": { "images": ["12", 0], "trim_frames": ["18", 1], "audio": ["13", 0], "fps": 24, "match_tail": true }, "_meta": { "title": "Trim Continuation" } },
   "20": { "class_type": "MiniMaxH3AssembleExtension", "inputs": { "source_frames": ["17", 0], "source_audio": ["17", 1], "source_fps": ["17", 2], "continuation_images": ["19", 0], "continuation_audio": ["19", 1], "fps": 24, "crop": "center" }, "_meta": { "title": "Assemble Extension" } }
 }
-

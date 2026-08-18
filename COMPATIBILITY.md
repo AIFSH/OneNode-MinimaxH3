@@ -25,6 +25,17 @@ These are the commit SHAs the node was developed against. You don't need to pin 
 | comfyui-kjnodes | `6ab7e81` | High Quality preset (SageAttention) |
 | Comfyui_Minimax_h3_latent_Upscaler | `59f399f` | Optional Latent Upscaler panel |
 
+> **Sigma Refiner needs no extra pack.** The Sigma Refiner slider is backed by
+> the natively bundled `H3OneSigmaRefiner` node, whose algorithm is credited to
+> [ComfyUI-YCNodes-MiniMax-H3](https://github.com/yichengup/ComfyUI-YCNodes-MiniMax-H3)
+> (pure PyTorch, no third-party dependency). Installing that pack is optional
+> and does not change how this node behaves.
+
+> **Second Pass (双采) needs no extra pack either.** It is wired from core
+> ComfyUI nodes only (`BasicScheduler` + `RandomNoise` +
+> `SamplerCustomAdvanced`), reusing the same shifted model, guider and sampler
+> as pass 1 — no VAE round-trip and no custom-node dependency.
+
 > **Important for Chain / Keyframes / Extend:** `ComfyUI-H3-Motion-Context-MultiRef`
 > current `main` dropped the legacy patch path and requires ComfyUI PR #15439
 > (ComfyUI 0.33+). On the pinned ComfyUI 0.32.0 stack you must stay on the tested
@@ -39,6 +50,13 @@ These are the commit SHAs the node was developed against. You don't need to pin 
 > ```
 >
 > then restart ComfyUI (or upgrade ComfyUI to 0.33+ and use the current pack).
+
+> **Do not use the old `ComfyUI-H3-Motion-Context` pack.** The old single-pack
+> repo (NikoDemon80) registers the same node class names and monkey-patches
+> ComfyUI's packed layout with self-tests that fail on current core — Chain
+> dies at render time with `h3_motion_context: the layout patch could not be
+> applied`. Install `ComfyUI-H3-Motion-Context-MultiRef` instead and remove or
+> disable the old folder.
 
 ## Models
 

@@ -8,8 +8,10 @@ import subprocess
 import hashlib
 import tempfile
 import re
+import math
 from pathlib import Path
 
+import torch
 import folder_paths
 import node_helpers
 from aiohttp import web
@@ -35,6 +37,25 @@ def _ensure_h3_keyframe_ref_merge():
         pack_name = "ComfyUI-H3-Motion-Context-MultiRef"
         root = os.path.dirname(NODE_DIR)
         pack_dir = os.path.join(root, pack_name)
+        # The old single-pack "ComfyUI-H3-Motion-Context" (NikoDemon80) predates
+        # the MultiRef fork and patches ComfyUI's packed layout with monkey
+        # patches whose self-test fails on current core - chain then dies at
+        # render time with "the layout patch could not be applied". It also
+        # registers the same node class names, so it conflicts with the
+        # required pack when both are installed. Surface that up front.
+        old_pack_dir = os.path.join(root, "ComfyUI-H3-Motion-Context")
+        if os.path.isdir(old_pack_dir):
+            print("[H3One] WARNING: found the OLD 'ComfyUI-H3-Motion-Context' pack "
+                  "instead of the required 'ComfyUI-H3-Motion-Context-MultiRef'.")
+            print("[H3One] Chain / Keyframes / Extend will fail with 'the layout patch could "
+                  "not be applied' on current ComfyUI (same class names also conflict). Fix:")
+            print("[H3One]   cd ComfyUI/custom_nodes")
+            print("[H3One]   git clone https://github.com/seitanism/ComfyUI-H3-Motion-Context-MultiRef.git")
+            print("[H3One]   cd ComfyUI-H3-Motion-Context-MultiRef")
+            print("[H3One]   git fetch origin && git checkout 0719855   # pinned ComfyUI 0.32 build")
+            print("[H3One]   remove or disable the old ComfyUI-H3-Motion-Context folder, then restart.")
+            if not os.path.isdir(pack_dir):
+                return
         path = os.path.join(pack_dir, "patch_payload.py")
         if not os.path.isfile(path):
             compat_path = os.path.join(pack_dir, "h3_compat.py")
@@ -1091,6 +1112,85 @@ class H3AudioSlice:
         return (out,)
 
 
+class H3OneSigmaRefiner:
+    """Low-sigma detail refiner for MiniMax H3 (internal).
+
+    Re-implemented from yichengup/ComfyUI-YCNodes-MiniMax-H3's H3SigmaRefiner
+    (no third-party dependencies): the scheduler's noise schedule keeps its
+    high-sigma head untouched, while the low-sigma tail is resampled into a
+    longer, denser, smoother curve so the model spends extra iterations on
+    fine detail. This removes pixel grain / flicker on fast-moving edges
+    without re-encoding anything upstream.
+
+    Graph wiring (done by the frontend):
+        BasicScheduler -> (sigmas) -> H3OneSigmaRefiner -> (sigmas) ->
+        SamplerCustomAdvanced
+
+    The UI exposes a single slider (extra_steps, 0 = node removed / passthrough);
+    start_at_sigma / end_at_sigma / spacing keep the upstream defaults.
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "sigmas": ("SIGMAS",),
+                "extra_steps": ("INT", {"default": 1, "min": 0, "max": 15, "step": 1}),
+                "start_at_sigma": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 20.0, "step": 0.01}),
+                "end_at_sigma": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 5.0, "step": 0.01}),
+                "spacing": (["cosine", "linear", "exponential"], {"default": "cosine"}),
+            }
+        }
+
+    RETURN_TYPES = ("SIGMAS",)
+    RETURN_NAMES = ("sigmas",)
+    FUNCTION = "refine"
+    CATEGORY = "One Node"
+
+    def refine(self, sigmas, extra_steps, start_at_sigma, end_at_sigma, spacing):
+        if extra_steps <= 0:
+            return (sigmas,)
+
+        # Work on a CPU copy; the schedule is tiny.
+        sigmas_cpu = sigmas.detach().cpu()
+
+        # First index where the schedule drops to (or below) the start threshold.
+        idx = -1
+        for i, s in enumerate(sigmas_cpu):
+            if s <= start_at_sigma:
+                idx = i
+                break
+
+        # Threshold never reached, or only the terminal 0.0 remains - nothing to refine.
+        if idx == -1 or idx >= len(sigmas_cpu) - 1:
+            return (sigmas,)
+
+        unmodified_head = sigmas_cpu[:idx]
+        A = sigmas_cpu[idx].item()
+        B = max(end_at_sigma, sigmas_cpu[-1].item())
+
+        original_tail_len = len(sigmas_cpu) - idx
+        new_tail_len = original_tail_len + extra_steps
+
+        t = torch.linspace(0.0, 1.0, steps=new_tail_len)
+        if spacing == "cosine":
+            factor = (1.0 - torch.cos(t * math.pi)) / 2.0
+        elif spacing == "exponential":
+            alpha = 3.0
+            factor = (torch.exp(t * alpha) - 1.0) / (math.exp(alpha) - 1.0)
+        else:  # linear
+            factor = t
+
+        new_tail = A + (B - A) * factor
+
+        # Keep the schedule's absolute convergence point at 0.0 when present.
+        if sigmas_cpu[-1].item() == 0.0 and B > 0.0:
+            new_tail = torch.cat([new_tail, torch.tensor([0.0])])
+
+        new_sigmas = torch.cat([unmodified_head, new_tail])
+        return (new_sigmas.to(device=sigmas.device, dtype=sigmas.dtype),)
+
+
 class H3NestedLatentUpscaler:
     """NestedTensor-aware wrapper around Comfyui_Minimax_h3_latent_Upscaler.
 
@@ -1100,6 +1200,12 @@ class H3NestedLatentUpscaler:
     value. This wrapper unpacks the nested value, sends only the video tensor to
     the upstream node, then rebuilds the original NestedTensor with the untouched
     audio members.
+
+    The optional `trigger` input is a STRING dependency used by the Chain
+    deferred two-stage layout: the frontend wires it to the LAST clip's saved
+    latent path, so the upscaler (and therefore the second pass downstream)
+    only runs after every clip's first pass has finished. The value itself is
+    ignored - it exists purely to carry the graph dependency.
     """
 
     @classmethod
@@ -1112,7 +1218,10 @@ class H3NestedLatentUpscaler:
                 "scale": ("FLOAT", {"default": 2.0, "min": 1.0, "max": 4.0, "step": 0.1}),
                 "device": (["cuda", "cpu"], {"default": "cuda"}),
                 "precision": (["fp32", "fp16", "bf16"], {"default": "fp32"}),
-            }
+            },
+            "optional": {
+                "trigger": ("STRING", {"default": ""}),
+            },
         }
 
     RETURN_TYPES = ("LATENT",)
@@ -1120,7 +1229,7 @@ class H3NestedLatentUpscaler:
     FUNCTION = "run"
     CATEGORY = "One Node"
 
-    def run(self, latent, model_name="none", variant="2D", scale=2.0, device="cuda", precision="fp32"):
+    def run(self, latent, model_name="none", variant="2D", scale=2.0, device="cuda", precision="fp32", trigger=""):
         if not isinstance(latent, dict) or "samples" not in latent:
             return (latent,)
         if not model_name or model_name == "none" or str(model_name).startswith("("):
@@ -1177,6 +1286,7 @@ NODE_CLASS_MAPPINGS = {
     "H3IdentityAnchor": H3IdentityAnchor,
     "H3AudioTrim": H3AudioTrim,
     "H3AudioSlice": H3AudioSlice,
+    "H3OneSigmaRefiner": H3OneSigmaRefiner,
     "H3NestedLatentUpscaler": H3NestedLatentUpscaler,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -1185,5 +1295,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "H3IdentityAnchor": "H3 Identity Anchor (internal)",
     "H3AudioTrim": "H3 Audio Trim (internal)",
     "H3AudioSlice": "H3 Audio Slice (internal)",
+    "H3OneSigmaRefiner": "H3 Sigma Refiner (internal)",
     "H3NestedLatentUpscaler": "H3 Nested Latent Upscaler (internal)",
 }

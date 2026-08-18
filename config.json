@@ -62,6 +62,17 @@
     "high": { "label": "High Quality", "steps": 40, "sol_attn": false, "cache": false, "sage": true },
     "turbo": { "label": "Turbo (Speed LoRA)", "steps": 6, "sol_attn": false, "cache": false, "sage": false }
   },
+  "sigma_refiner": {
+    "extra_steps": 1,
+    "start_at_sigma": 0.7,
+    "end_at_sigma": 0.0,
+    "spacing": "cosine"
+  },
+  "dual_sampling": {
+    "enabled": false,
+    "steps": 10,
+    "denoise": 0.4
+  },
   "prompt_templates": {
     "t2v": {
       "name": "Text to Video",

@@ -75,6 +75,54 @@ latent through
 before VAE decode. Choose the checkpoint, 2D/3D variant, scale, device and
 precision; place the checkpoint in `ComfyUI/models/latent_upscale_models/`.
 
+### Sigma Refiner
+
+A single **Sigma Refiner** slider in the parameter area (0–15 extra steps,
+default 1, 0 = off) refines the low-noise tail of the sampling schedule: the
+scheduler's high-sigma head stays untouched, while the tail is resampled into a
+longer, denser, smoother curve so the model spends extra iterations on fine
+detail — removing pixel grain / flicker on fast-moving edges. The start / end
+thresholds and spacing keep the upstream defaults (start 0.7, end 0.0, cosine).
+The node is bundled natively (`H3OneSigmaRefiner`) — no extra custom-node pack
+is required — with the algorithm credited to
+[ComfyUI-YCNodes-MiniMax-H3](https://github.com/yichengup/ComfyUI-YCNodes-MiniMax-H3).
+
+### Second Pass (双采)
+
+An optional **Second Pass** toggle in the parameter area runs a two-pass latent
+refinement with fully automatic parameters — no extra controls: pass 1 renders
+the clip with the normal full-denoise schedule, then pass 2 feeds the same
+packed video+audio latent back through a second sampler at a lower `denoise`
+(automatic defaults: 10 steps, denoise 0.4) so the model redraws detail instead
+of generating from scratch. This is the classic two-pass technique used by
+LTX Stage 1→2 and
+[Muse-MiniMax-H3-Refine](https://github.com/muse-collective-26/Muse-MiniMax-H3-Refine)
+hi-res fixes, done entirely in latent space — no VAE round-trip, no extra packs.
+It applies to every mode, including each Chain clip. Off by default, since it
+roughly doubles sampling time.
+When the **Latent Upscaler** is also enabled, T2V and R2V switch to the
+RunningHub 一采-放大-二采 split-schedule layout: the schedule is split in half
+automatically (the raw scheduler schedule is split first, then the Sigma
+Refiner is applied to pass 1's branch) — pass 1 runs the high-sigma head at
+base resolution with the extra detail steps, the video latent is upscaled from
+pass 1's clean estimate (`denoised_output`, with the 3D upscaler at fp16 —
+audio stays untouched), and pass 2 finishes the low-sigma tail at the upscaled
+resolution with the sampler forced to `euler` (`pass 1 → upscale → pass 2 →
+decode`). Feeding the still-noisy intermediate instead of the clean estimate
+would corrupt the upscaler's output and garble the video. R2V drops its frame-0
+identity anchor in this mode, matching the reference workflow.
+In Chain with the upscaler enabled it uses the same split schedule: every clip
+runs the high-sigma head at base resolution first (motion-context continuity
+stays on those clean base latents), then a gated final stage upscales each
+clip and runs the low-sigma tail — the stage waits for the last clip's first
+pass via a trigger on the upscaler node, and pass 2 uses the base conditioning
+(no motion-context keyframes) because H3 keyframe rows scale with the canvas
+and cannot be re-sampled after upscaling. Keyframe-based modes (I2V, Keyframes)
+keep the upscaler on the output side
+(`pass 1 → pass 2 → upscale → decode`): H3 keyframe rows scale with the target
+canvas while the keyframe latents stay base-encoded, so an upscaled latent
+cannot be re-sampled there.
+
 ## Screenshots
 
 **History** — searchable, with prompt reuse and per-entry preview.

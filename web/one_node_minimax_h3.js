@@ -90,6 +90,10 @@ const I18N = {
     "ui.quality": "Quality",
     "ui.sampler": "Sampler",
     "ui.scheduler": "Scheduler",
+    "ui.sigma.refine": "Sigma Refiner",
+    "tip.sigma.refine": "Low-sigma detail refinement (from ComfyUI-YCNodes-MiniMax-H3).\nAdds extra smoothing steps at the low-noise tail of the schedule to remove pixel grain / flicker on fast-moving edges.\n0 = off. Default 1. Thresholds and spacing use defaults (start 0.7, end 0.0, cosine).",
+    "ui.dual": "Second Pass",
+    "tip.dual": "Second-pass latent refinement (双采), parameters are automatic.\nDefault: pass 1 renders the full clip, then a second sampler partially re-denoises the same packed video+audio latent (10 steps at denoise 0.4).\nWith the Latent Upscaler enabled, T2V / R2V switch to the RunningHub 一采-放大-二采 split-schedule layout: the raw schedule is split in half — pass 1 runs the high-sigma head at base resolution with the Sigma Refiner's extra detail steps, the video latent is upscaled (from pass 1's clean estimate, 3D upscaler at fp16), and pass 2 finishes the low-sigma tail at the upscaled resolution (sampler forced to euler, matching the reference workflow; R2V drops its frame-0 anchor here).\nIn Chain with the upscaler enabled it uses the same split schedule: all clips run the high-sigma head at base resolution first (continuity stays on those clean base latents), then a gated final stage upscales each clip and runs the low-sigma tail — pass 2 uses the base conditioning (no motion-context keyframes) because H3 keyframe rows scale with the canvas and cannot be re-sampled after upscaling. I2V / Keyframes keep the upscaler on the output side for the same reason.\nOff by default — roughly doubles sampling time when enabled.",
     "ui.advanced": "Advanced",
     "ui.loras.none": "LoRAs — none loaded",
     "ui.loras.loaded": "LoRAs — {n} loaded",
@@ -294,6 +298,10 @@ const I18N = {
     "ui.quality": "画质",
     "ui.sampler": "采样器",
     "ui.scheduler": "调度器",
+    "ui.sigma.refine": "Sigma 精修",
+    "tip.sigma.refine": "低噪细节精修（源自 ComfyUI-YCNodes-MiniMax-H3）。\n在噪声调度的低噪尾部增加平滑步数，消除高速运动边缘的像素颗粒与闪烁。\n0 = 关闭。默认 1。阈值与分布曲线使用默认值（起始 0.7、结束 0.0、cosine）。",
+    "ui.dual": "二次采样",
+    "tip.dual": "第二遍潜空间精修（双采），参数全自动。\n默认：第一遍完整 denoise 渲染全片，第二遍采样器在同一份打包的视频+音频 latent 上做局部重绘（10 步、denoise 0.4）。\n同时开启 Latent 放大时，T2V / R2V 切换为 RunningHub 的「一采-放大-二采」拆分调度：原始调度自动对半拆分——第一遍在基础分辨率跑高 sigma 头部（Sigma 精修的加步也作用在第一遍），视频 latent 从第一遍的干净估计（denoised_output）放大（3D、fp16），第二遍在放大分辨率跑低 sigma 尾部（采样器强制 euler，与参考工作流一致；R2V 此时不插入第 0 帧锚点）。\nChain 开启放大时同样用拆分调度：所有片段先在基础分辨率跑高 sigma 头部（连续性沿用干净基础 latent），受门控的最终阶段再逐片段放大并跑低 sigma 尾部——二采使用基础 conditioning 引导器（不含 MotionContext 关键帧），因为 H3 关键帧行数随画布缩放、放大后无法再采样。I2V / Keyframes 仍保持输出侧放大。\n默认关闭——开启后采样时间约翻倍。",
     "ui.advanced": "高级",
     "ui.loras.none": "LoRA — 未加载",
     "ui.loras.loaded": "LoRA — 已加载 {n} 个",
@@ -524,6 +532,20 @@ const MODE_DESC = {
 const TEMPLATES = {
   t2v:"t2v.json", i2v:"i2v.json", r2v:"r2v.json",
   keyframes:"keyframes.json", extend:"video_extend.json", chain:"chain_section.json",
+};
+
+// Sigma Refiner defaults, matching config.json and the upstream
+// ComfyUI-YCNodes-MiniMax-H3 H3SigmaRefiner node. Only extra_steps is exposed
+// in the UI (a single slider); the rest keep the upstream defaults.
+const SIGMA_REFINE_DEFAULTS = {
+  extra_steps:1, start_at_sigma:0.7, end_at_sigma:0.0, spacing:"cosine",
+};
+
+// Second-pass (双采) defaults, matching config.json. Pass 2 runs a partial-
+// denoise refine over pass 1's packed AV latent; denoise 0.4 is the same
+// starting point Muse-MiniMax-H3-Refine uses for its refine pass.
+const DUAL_SAMPLING_DEFAULTS = {
+  enabled:false, steps:10, denoise:0.4,
 };
 
 // Common video aspect ratios offered next to the resolution picker. "auto"
@@ -1292,6 +1314,13 @@ app.registerExtension({
           sound:           saved.sound||"chime",
           accent:          (saved.accent&&saved.accent!=="#f0ff41"&&saved.accent.toLowerCase()!=="#00e5ff")?saved.accent:ACCENT_DEFAULT,
           mcLength:        saved.mcLength!==undefined?saved.mcLength:22,
+          sigmaRefine:     (saved.sigmaRefine!==undefined)?Math.max(0,Math.min(15,Math.round(Number(saved.sigmaRefine)||0))):SIGMA_REFINE_DEFAULTS.extra_steps,
+          sigmaRefineCfg:  Object.assign({}, SIGMA_REFINE_DEFAULTS, (saved.sigmaRefineCfg&&typeof saved.sigmaRefineCfg==="object")?saved.sigmaRefineCfg:{}),
+          dualPass:        saved.dualPass!==undefined?!!saved.dualPass:DUAL_SAMPLING_DEFAULTS.enabled,
+          // Second-pass parameters are automatic (fixed defaults); the UI only
+          // exposes the enable toggle.
+          dualSteps:       DUAL_SAMPLING_DEFAULTS.steps,
+          dualDenoise:     DUAL_SAMPLING_DEFAULTS.denoise,
           customW:         saved.customW||960,
           customH:         saved.customH||544,
           latentUpscale:   (saved.latentUpscale&&typeof saved.latentUpscale==="object")
@@ -1313,6 +1342,7 @@ app.registerExtension({
         };
       }
       const S=self._h3_S;
+      const _upscaleOn=()=>!!(S.latentUpscale&&S.latentUpscale.enabled&&S.latentUpscale.model&&S.latentUpscale.model!=="none"&&!String(S.latentUpscale.model).startsWith("("));
       if(S.audioLock){
         const af=_validAudioName(S.audioFile);
         if(!af && Array.isArray(S.refAudios)){
@@ -1356,6 +1386,8 @@ app.registerExtension({
           kf:(S.kf||[]).map(k=>({img:k.img||null,pos:k.pos||0})),
           models:S.models,speedLora:S.speedLora,audioOn:S.audioOn,
           soundEnabled:S.soundEnabled,sound:S.sound,accent:S.accent,mcLength:S.mcLength,
+          sigmaRefine:S.sigmaRefine,sigmaRefineCfg:S.sigmaRefineCfg,
+          dualPass:S.dualPass,
           latentUpscale:S.latentUpscale,
           modeSettings:S.modeSettings,
           autoSave:S.autoSave,customW:S.customW,customH:S.customH,
@@ -2803,7 +2835,31 @@ app.registerExtension({
       schedCapRow.append(schedCap,infoIcon("tip.scheduler"));
       const schedDD=DD(["simple","sgm_uniform","karras","exponential","ddim_uniform","beta","normal","linear_quadratic","kl_optimal","bong_tangent","beta57"],S.schedulerName||"simple",v=>{S.schedulerName=v;persist();});
       schedRow.append(schedCapRow,schedDD.el);
-      params.append(resRow,durRow,stepsRow,qualRow,samplerRow,schedRow);
+      const sigmaRow=mk("div",{display:"flex",flexDirection:"column",gap:"3px"});
+      const sigmaCapRow=mk("div",{display:"flex",alignItems:"center",gap:"4px"});
+      const sigmaCap=mk("div",{fontSize:"10px",color:C.text});_tr(sigmaCap,"ui.sigma.refine");
+      sigmaCapRow.append(sigmaCap,infoIcon("tip.sigma.refine"));
+      const sigmaInner=mk("div",{display:"flex",alignItems:"center",gap:"8px"});
+      const sigmaRange=mk("input",{flex:"1",minWidth:"0",height:"16px",cursor:"pointer",accentColor:"var(--h3accent)",margin:"0"},{type:"range",min:"0",max:"15",step:"1",value:String(S.sigmaRefine)});
+      const sigmaVal=mk("div",{fontSize:"11px",color:C.lime,width:"16px",textAlign:"right",flexShrink:"0",fontVariantNumeric:"tabular-nums"});
+      tx(sigmaVal,String(S.sigmaRefine));
+      sigmaRange.oninput=()=>{
+        const v=Math.round(Number(sigmaRange.value)||0);
+        S.sigmaRefine=Math.max(0,Math.min(15,v));
+        tx(sigmaVal,String(S.sigmaRefine));
+        persist();
+      };
+      sigmaInner.append(sigmaRange,sigmaVal);
+      sigmaRow.append(sigmaCapRow,sigmaInner);
+      const dualRow=mk("div",{display:"flex",flexDirection:"column",gap:"2px"});
+      const dualToggle=Toggle("ui.dual", !!S.dualPass, v=>{
+        S.dualPass=!!v;
+        persist();
+      }, "tip.dual");
+      dualToggle.el.style.borderBottom="none";
+      dualToggle.el.style.padding="6px 0";
+      dualRow.append(dualToggle.el);
+      params.append(resRow,durRow,stepsRow,qualRow,samplerRow,schedRow,sigmaRow,dualRow);
       const _saveModeState=()=>{
         S.modeSettings[S.mode]={
           prompt:S.prompt,steps:S.steps,quality:S.quality,resolution:S.resolution,duration:S.duration,
@@ -3392,6 +3448,8 @@ app.registerExtension({
           files,
           seed:S.seed||0,
           steps:S.steps,
+          sigmaRefine:S.sigmaRefine,
+          dualPass:S.dualPass,
           width:res.width,
           height:res.height,
           latentUpscale:S.latentUpscale||{enabled:false},
@@ -3534,8 +3592,124 @@ app.registerExtension({
         }
         _insertModelPatches(wf);
         _applyAutoSave(wf);
+        // Second-pass (双采) latent refinement.
+        // - Default path: pass 2 partially re-denoises pass 1's BASE-resolution
+        //   latent; the latent upscaler (if any) stays on the output side.
+        // - Reference path (dual + upscaler + T2V/R2V): the RunningHub
+        //   "一采-放大-二采" layout - the schedule is split, pass 1 runs the
+        //   high-sigma head at base res, the video latent is upscaled, and
+        //   pass 2 finishes the low-sigma tail at the upscaled res. Only
+        //   refs-based / no-ref conditioning is safe there (ref rows use the
+        //   ref's own latent grid); keyframe conditioning scales its rows with
+        //   the target canvas (all_video_rows[~img_update] = cond_video_rows),
+        //   so keyframe modes keep the output-side layout.
+        const _syncDualPass=(wf)=>{
+          const steps=Math.max(1,Math.min(60,Math.round(Number(S.dualSteps)||DUAL_SAMPLING_DEFAULTS.steps)));
+          const denoise=Math.max(0.05,Math.min(1.0,Number(S.dualDenoise)||DUAL_SAMPLING_DEFAULTS.denoise));
+          const p2sched="29",p2noise="30",p2sampler="31",splitId="28";
+          const refMode=S.dualPass&&_upscaleOn()&&["t2v","r2v"].includes(S.mode);
+          if(S.dualPass){
+            if(refMode){
+              // SplitSigmas is inserted after the sigma refiner sync below;
+              // this branch only lays down pass 2 (tail sigmas, upscaled latent).
+              wf[p2noise]={class_type:"RandomNoise",inputs:{noise_seed:S.seed||0},_meta:{title:"Noise (2nd Pass)"}};
+              wf[p2sampler]={class_type:"SamplerCustomAdvanced",inputs:{
+                noise:[p2noise,0],
+                guider:["7",0],
+                sampler:["10",0],
+                sigmas:[splitId,1],
+                latent_image:["650",0],
+              },_meta:{title:"Sampler Custom Advanced (2nd Pass)"}};
+            } else {
+              wf[p2sched]={class_type:"BasicScheduler",inputs:{
+                model:["5",0],
+                scheduler:S.schedulerName||"simple",
+                steps,
+                denoise,
+              },_meta:{title:"Scheduler (2nd Pass)"}};
+              wf[p2noise]={class_type:"RandomNoise",inputs:{noise_seed:S.seed||0},_meta:{title:"Noise (2nd Pass)"}};
+              wf[p2sampler]={class_type:"SamplerCustomAdvanced",inputs:{
+                noise:[p2noise,0],
+                guider:["7",0],
+                sampler:["10",0],
+                sigmas:[p2sched,0],
+                latent_image:["11",0],
+              },_meta:{title:"Sampler Custom Advanced (2nd Pass)"}};
+            }
+            if(wf["12"]) wf["12"].inputs.samples=[p2sampler,0];
+            if(wf["13"]) wf["13"].inputs.samples=[p2sampler,0];
+          } else {
+            delete wf[splitId]; delete wf[p2sched]; delete wf[p2noise]; delete wf[p2sampler];
+            if(wf["12"]) wf["12"].inputs.samples=["11",0];
+            if(wf["13"]) wf["13"].inputs.samples=["11",0];
+          }
+        };
+        _syncDualPass(wf);
         _insertCacheBust(wf);
-        _insertLatentUpscaler(wf,"11","12","650");
+        _insertLatentUpscaler(wf, S.dualPass?"31":"11", "12", "650");
+        // Sigma Refiner: rewire BasicScheduler -> (sigmas) -> Refiner -> Sampler
+        // whenever the slider is > 0; otherwise remove the node and restore the
+        // direct scheduler -> sampler link.
+        const _syncSigmaRefiner=(wf,schedId,samplerId)=>{
+          const srCfg=Object.assign({}, SIGMA_REFINE_DEFAULTS, S.sigmaRefineCfg||{});
+          const srSteps=Math.max(0,Math.min(15,Math.round(Number(S.sigmaRefine)||0)));
+          let srId=Object.keys(wf).find(id=>wf[id]&&wf[id].class_type==="H3OneSigmaRefiner");
+          if(srSteps<=0){
+            if(srId) delete wf[srId];
+            if(wf[samplerId]) wf[samplerId].inputs.sigmas=[schedId,0];
+            return;
+          }
+          if(!srId){
+            srId="651";
+            wf[srId]={class_type:"H3OneSigmaRefiner",inputs:{},_meta:{title:"Sigma Refiner"}};
+          }
+          Object.assign(wf[srId].inputs,{
+            sigmas:[schedId,0],
+            extra_steps:srSteps,
+            start_at_sigma:srCfg.start_at_sigma,
+            end_at_sigma:srCfg.end_at_sigma,
+            spacing:srCfg.spacing,
+          });
+          if(wf[samplerId]) wf[samplerId].inputs.sigmas=[srId,0];
+        };
+        _syncSigmaRefiner(wf,"9","11");
+        // Reference-mode split (一采-放大-二采): split the RAW scheduler
+        // schedule first, then apply the sigma refiner to PASS 1's branch so
+        // its extra low-sigma detail steps run at base resolution (一采), and
+        // pass 2 receives the untouched low tail at the upscaled resolution.
+        // Both branches meet at the same split sigma (~half), so pass 2
+        // continues exactly where pass 1 stopped. (Splitting the REFINED
+        // schedule instead made the cosine-densified tail push the index-based
+        // split down to sigma ~0.12, so pass 1 did almost all the work at base
+        // res and pass 2 got a near-empty tail at 2x - the source of the
+        // garbled output.)
+        if(S.dualPass && _upscaleOn() && ["t2v","r2v"].includes(S.mode)){
+          const total=Math.max(2,Math.round(Number(S.steps)||20));
+          // Automatic split: pass 2 (low-sigma tail) runs half the steps at
+          // the upscaled resolution; pass 1 runs the rest at base resolution.
+          const split=Math.max(1,Math.min(total-1,Math.round(total/2)));
+          wf["28"]={class_type:"SplitSigmas",inputs:{sigmas:["9",0],step:split},_meta:{title:"Split Sigmas"}};
+          const srId=Object.keys(wf).find(id=>wf[id]&&wf[id].class_type==="H3OneSigmaRefiner");
+          if(srId){
+            wf[srId].inputs.sigmas=["28",0];
+            if(wf["11"]) wf["11"].inputs.sigmas=[srId,0];
+          } else {
+            if(wf["11"]) wf["11"].inputs.sigmas=["28",0];
+          }
+          if(wf["31"]) wf["31"].inputs.sigmas=["28",1];
+          if(wf["31"]) wf["31"].inputs.latent_image=["650",0];
+          // Feed pass 1's CLEAN estimate (denoised_output, slot 1) into the
+          // upscaler, matching the reference workflow: the latent upscaler is
+          // trained on clean latents, so upscaling the still-noisy sampling
+          // state (slot 0) produces a corrupted intermediate and garbled video.
+          if(wf["650"]) wf["650"].inputs.latent=["11",1];
+          if(wf["12"]) wf["12"].inputs.samples=["31",0];
+          if(wf["13"]) wf["13"].inputs.samples=["31",0];
+          // Match the reference workflow's validated sampling config: euler
+          // sampler for both passes, 3D upscaler at fp16.
+          if(wf["10"]&&wf["10"].class_type==="KSamplerSelect") wf["10"].inputs.sampler_name="euler";
+          if(wf["650"]){ wf["650"].inputs.variant="3D"; wf["650"].inputs.precision="fp16"; }
+        }
         return {frames,res};
       };
 
@@ -3573,18 +3747,26 @@ app.registerExtension({
             // keyframe so the shot STARTS from it. Reference videos then provide
             // motion only - without this, a talking ref video outranks the still
             // image ~2:1 in the packed sequence and its face wins (verified).
-            const kfId=newId();
-            wf[kfId]={class_type:"H3IdentityAnchor",inputs:{
-              conditioning:["6",0],
-              vae:["3",0],
-              latent:["6",1],
-              frame_count:Number(wf["6"].inputs.length)||124,
-              width:Number(wf["6"].inputs.width)||960,
-              height:Number(wf["6"].inputs.height)||544,
-              anchor:"first",
-              image:[firstImgId,0],
-            },_meta:{title:"Identity Anchor (frame 0)"}};
-            wf["7"].inputs.conditioning=[kfId,0];
+            // Skipped in the 一采-放大-二采 reference mode (dual + upscaler):
+            // the anchor is a keyframe, and keyframe rows scale with the target
+            // canvas while the anchor latent stays base-encoded - an upscaled
+            // pass-2 latent would crash with a row-count shape mismatch. The
+            // reference image alone carries identity, matching the RunningHub
+            // workflow.
+            if(!(S.dualPass&&_upscaleOn()&&S.mode==="r2v")){
+              const kfId=newId();
+              wf[kfId]={class_type:"H3IdentityAnchor",inputs:{
+                conditioning:["6",0],
+                vae:["3",0],
+                latent:["6",1],
+                frame_count:Number(wf["6"].inputs.length)||124,
+                width:Number(wf["6"].inputs.width)||960,
+                height:Number(wf["6"].inputs.height)||544,
+                anchor:"first",
+                image:[firstImgId,0],
+              },_meta:{title:"Identity Anchor (frame 0)"}};
+              wf["7"].inputs.conditioning=[kfId,0];
+            }
           }
           if(S.refVideos.length){
             S.refVideos.forEach((entry,idx)=>{
@@ -3733,6 +3915,98 @@ app.registerExtension({
           out["c"+idx+":sched"].inputs.steps=S.steps;
           out["c"+idx+":sched"].inputs.scheduler=S.schedulerName||"simple";
           if(out["c"+idx+":ksel"]&&out["c"+idx+":ksel"].class_type==="KSamplerSelect") out["c"+idx+":ksel"].inputs.sampler_name=S.samplerName||"res_multistep";
+          // Sigma Refiner per clip: keep the cloned refiner wired when the
+          // slider is > 0; otherwise drop the node and restore the direct
+          // scheduler -> sampler link.
+          const srCfg=Object.assign({}, SIGMA_REFINE_DEFAULTS, S.sigmaRefineCfg||{});
+          const srSteps=Math.max(0,Math.min(15,Math.round(Number(S.sigmaRefine)||0)));
+          const srNode=out["c"+idx+":refine"];
+          if(srNode){
+            if(srSteps>0){
+              Object.assign(srNode.inputs,{
+                sigmas:["c"+idx+":sched",0],
+                extra_steps:srSteps,
+                start_at_sigma:srCfg.start_at_sigma,
+                end_at_sigma:srCfg.end_at_sigma,
+                spacing:srCfg.spacing,
+              });
+              out["c"+idx+":sampler"].inputs.sigmas=["c"+idx+":refine",0];
+            } else {
+              delete out["c"+idx+":refine"];
+              out["c"+idx+":sampler"].inputs.sigmas=["c"+idx+":sched",0];
+            }
+          }
+          // Second-pass (双采) per clip.
+          // - Without a latent upscaler: pass 2 partially re-denoises pass 1's
+          //   base latent (own 10-step / denoise-0.4 schedule, motion-context
+          //   guider) and feeds the decoders + saved context latent directly.
+          // - With a latent upscaler: the RunningHub 一采-放大-二采 split
+          //   schedule, deferred to a gated stage-2 pass. Pass 1 runs the
+          //   high-sigma head at base res (sigma refiner + motion-context
+          //   guider); its CLEAN estimate (slot 1) feeds continuity and the
+          //   upscaler. Pass 2 runs the low-sigma tail on the UPSCALED latent
+          //   with the BASE conditioning guider (no motion-context keyframes):
+          //   H3 keyframe rows scale with the target canvas while the keyframe
+          //   latents stay base-encoded, so an upscaled latent cannot be
+          //   re-sampled under the motion-context guider.
+          if(S.dualPass){
+            const dSteps=Math.max(1,Math.min(60,Math.round(Number(S.dualSteps)||DUAL_SAMPLING_DEFAULTS.steps)));
+            const dDenoise=Math.max(0.05,Math.min(1.0,Number(S.dualDenoise)||DUAL_SAMPLING_DEFAULTS.denoise));
+            const dNoise="c"+idx+":noise2", dSampler="c"+idx+":sampler2";
+            const upOn=_upscaleOn();
+            if(upOn){
+              const splitId="c"+idx+":split";
+              const total=Math.max(2,Math.round(Number(S.steps)||20));
+              const split=Math.max(1,Math.min(total-1,Math.round(total/2)));
+              out[splitId]={class_type:"SplitSigmas",inputs:{sigmas:["c"+idx+":sched",0],step:split},_meta:{title:"Split Sigmas"}};
+              // Sigma refiner stays on pass 1's branch (base res).
+              const srNode=out["c"+idx+":refine"];
+              if(srNode){
+                srNode.inputs.sigmas=[splitId,0];
+                out["c"+idx+":sampler"].inputs.sigmas=["c"+idx+":refine",0];
+              } else {
+                out["c"+idx+":sampler"].inputs.sigmas=[splitId,0];
+              }
+              // Pass 2 uses the base conditioning WITHOUT motion-context
+              // keyframes (see comment above); motion continuity was already
+              // baked into pass 1's clean estimate at base resolution.
+              out["c"+idx+":guider2"]={class_type:"BasicGuider",inputs:{model:["s:5",0],conditioning:["c"+idx+":cond",0]},_meta:{title:"Basic Guider (2nd Pass)"}};
+              out[dNoise]={class_type:"RandomNoise",inputs:{noise_seed:seed},_meta:{title:"Noise (2nd Pass)"}};
+              out[dSampler]={class_type:"SamplerCustomAdvanced",inputs:{
+                noise:[dNoise,0],
+                guider:["c"+idx+":guider2",0],
+                sampler:["c"+idx+":ksel",0],
+                sigmas:[splitId,1],
+                latent_image:["c"+idx+":sampler",0],
+              },_meta:{title:"Sampler Custom Advanced (2nd Pass)"}};
+              if(out["c"+idx+":ksel"]&&out["c"+idx+":ksel"].class_type==="KSamplerSelect") out["c"+idx+":ksel"].inputs.sampler_name="euler";
+              // Continuity stays on pass 1's CLEAN estimate (slot 1); the raw
+              // split output is still noisy at the split sigma. The stage-2
+              // upscaler (below) also consumes slot 1.
+              save.inputs.latent=["c"+idx+":sampler",1];
+              out["c"+idx+":decode"].inputs.samples=["c"+idx+":sampler",1];
+              out["c"+idx+":decodea"].inputs.samples=["c"+idx+":sampler",1];
+            } else {
+              const dSched="c"+idx+":sched2";
+              out[dSched]={class_type:"BasicScheduler",inputs:{
+                model:["s:5",0],
+                scheduler:S.schedulerName||"simple",
+                steps:dSteps,
+                denoise:dDenoise,
+              },_meta:{title:"Scheduler (2nd Pass)"}};
+              out[dNoise]={class_type:"RandomNoise",inputs:{noise_seed:seed},_meta:{title:"Noise (2nd Pass)"}};
+              out[dSampler]={class_type:"SamplerCustomAdvanced",inputs:{
+                noise:[dNoise,0],
+                guider:["c"+idx+":guider",0],
+                sampler:["c"+idx+":ksel",0],
+                sigmas:[dSched,0],
+                latent_image:["c"+idx+":sampler",0],
+              },_meta:{title:"Sampler Custom Advanced (2nd Pass)"}};
+              out["c"+idx+":decode"].inputs.samples=[dSampler,0];
+              out["c"+idx+":decodea"].inputs.samples=[dSampler,0];
+              save.inputs.latent=[dSampler,0];
+            }
+          }
           save.inputs.filename_prefix="one-node-minimax-h3/chain/"+session;
           save.inputs.clip_index=idx+1;
           out["c"+idx+":savevid"].inputs.filename_prefix=`one-node-minimax-h3/chain/${session}/clip_${idx+1}`;
@@ -3745,8 +4019,13 @@ app.registerExtension({
             out[loadId]={class_type:"MiniMaxH3MotionContextLoadLatent",inputs:{latent_path:["c"+(idx-1)+":save",0],clip_index:0},_meta:{title:"Load Latent"}};
             mc.inputs.context_frames=["c"+(idx-1)+":trim",0];
             mc.inputs.context_latent=[loadId,0];
-            mc.inputs.context_length=S.mcLength;
-            mc.inputs.audio_context_length=S.mcLength;
+            // Send the grid values as strings: some versions of
+            // ComfyUI-H3-Motion-Context-MultiRef declare context_length as a
+            // string combo (["22","5","39","56"]) and ComfyUI's combo
+            // validation is strict (no int->str coercion), while INT versions
+            // coerce str->int themselves - a string satisfies both.
+            mc.inputs.context_length=String(S.mcLength);
+            mc.inputs.audio_context_length=String(S.mcLength);
             mc.inputs.crop="disabled";
             trim.inputs.trim_frames=["c"+idx+":mc",1];
           }
@@ -3755,19 +4034,30 @@ app.registerExtension({
             const upId="c"+idx+":up";
             const decodeUpId="c"+idx+":decodeUp";
             const trimUpId="c"+idx+":trimUp";
+            const deferred=!!S.dualPass;
             out[upId]={
               class_type:"H3NestedLatentUpscaler",
               inputs:{
-                latent:["c"+idx+":sampler",0],
+                // Deferred: consume pass 1's CLEAN estimate (slot 1) - the
+                // split-schedule pass-1 output is still noisy at the split
+                // sigma, and the upscaler is trained on clean latents.
+                latent:deferred?["c"+idx+":sampler",1]:["c"+idx+":sampler",0],
                 model_name:up.model,
-                variant:up.variant==="3d"?"3D":"2D",
+                variant:deferred?"3D":(up.variant==="3d"?"3D":"2D"),
                 scale:Number(up.scale)||2.0,
                 device:up.device==="cpu"?"cpu":"cuda",
-                precision:["fp32","fp16","bf16"].includes(up.precision)?up.precision:"fp32",
+                precision:deferred?"fp16":(["fp32","fp16","bf16"].includes(up.precision)?up.precision:"fp32"),
+                trigger:deferred?["c"+(clips.length-1)+":save",0]:"",
               },
               _meta:{title:"Latent Upscaler"},
             };
-            out[decodeUpId]={class_type:"VAEDecode",inputs:{samples:[upId,0],vae:["s:3",0]},_meta:{title:"VAE Decode (Upscaled)"}};
+            // Deferred stage 2: the upscaler consumes pass 1's final (clean)
+            // output, waits for the whole chain's first pass (trigger = the
+            // last clip's saved latent path), then the second pass refines the
+            // upscaled latent before decode.
+            const refineSrc=deferred?"c"+idx+":sampler2":upId;
+            if(deferred) out["c"+idx+":sampler2"].inputs.latent_image=[upId,0];
+            out[decodeUpId]={class_type:"VAEDecode",inputs:{samples:[refineSrc,0],vae:["s:3",0]},_meta:{title:"VAE Decode (Upscaled)"}};
             out[trimUpId]={class_type:"MiniMaxH3MotionContextTrim",inputs:{
               images:[decodeUpId,0],
               trim_frames:trim.inputs.trim_frames,
@@ -3826,6 +4116,8 @@ app.registerExtension({
           const fp=JSON.stringify({
             chain:clips.map(c=>({prompt:_finalPrompt(c.prompt),duration:c.duration})),
             seed:S.seed||0,steps:S.steps,width:res.width,height:res.height,audioLock,files:fpFiles,
+            sigmaRefine:S.sigmaRefine,
+            dualPass:S.dualPass,
             latentUpscale:S.latentUpscale||{enabled:false},
           });
           wf["s:bust"]={class_type:"H3CacheBust",inputs:{clip:["s:1",0],fingerprint:fp},_meta:{title:"Cache Invalidation"}};
@@ -3975,6 +4267,26 @@ app.registerExtension({
             S.resolution=_resItems[0].label;resDD.set(S.resolution);persist();
           }
           _updResCustom();
+          if(saved.sigmaRefine===undefined && d.sigma_refiner && typeof d.sigma_refiner==="object"){
+            const cfg=Object.assign({}, SIGMA_REFINE_DEFAULTS, S.sigmaRefineCfg||{}, d.sigma_refiner);
+            S.sigmaRefineCfg=cfg;
+            if(typeof cfg.extra_steps==="number"){
+              S.sigmaRefine=Math.max(0,Math.min(15,Math.round(cfg.extra_steps)));
+              sigmaRange.value=String(S.sigmaRefine);
+              tx(sigmaVal,String(S.sigmaRefine));
+              persist();
+            }
+          }
+          if(saved.dualPass===undefined && d.dual_sampling && typeof d.dual_sampling==="object"){
+            const dd=Object.assign({}, DUAL_SAMPLING_DEFAULTS, d.dual_sampling);
+            S.dualPass=!!dd.enabled;
+            // Parameters stay automatic: only the built-in defaults can vary
+            // through config; there is no per-user control.
+            S.dualSteps=Math.max(1,Math.min(60,Math.round(Number(dd.steps)||DUAL_SAMPLING_DEFAULTS.steps)));
+            S.dualDenoise=Math.max(0.05,Math.min(1,Number(dd.denoise)||DUAL_SAMPLING_DEFAULTS.denoise));
+            dualToggle._setChecked(S.dualPass);
+            persist();
+          }
           _discTmpl=d.prompt_templates||{};
         }catch(e){
           console.warn("[H3One] load config:",e);
